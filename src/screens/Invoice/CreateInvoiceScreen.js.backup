@@ -1,0 +1,405 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, ScrollView, StyleSheet, FlatList } from 'react-native';
+import { TextInput, Button, Text, Card, IconButton, Menu, Divider, Portal, Modal, List, HelperText } from 'react-native-paper';
+import { useStore } from '../../store/useStore';
+
+export default function CreateInvoiceScreen({ navigation, route }) {
+    const customers = useStore((state) => state.customers);
+    const products = useStore((state) => state.products);
+    const addInvoice = useStore((state) => state.addInvoice);
+    const updateInvoice = useStore((state) => state.updateInvoice);
+
+    const editingInvoice = route.params?.invoice; // If provided, we're editing
+
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [selectedProducts, setSelectedProducts] = useState([]);
+    const [note, setNote] = useState('');
+    const [deliveryInfo, setDeliveryInfo] = useState('');
+
+    // Populate form when editing
+    useEffect(() => {
+        if (editingInvoice) {
+            const customer = customers.find(c => c.id === editingInvoice.customerId);
+            setSelectedCustomer(customer || null);
+            setSelectedProducts(editingInvoice.items || []);
+            setNote(editingInvoice.note || '');
+            setDeliveryInfo(editingInvoice.deliveryInfo || '');
+        }
+    }, [editingInvoice]);
+
+    // Modal States
+    const [customerModalVisible, setCustomerModalVisible] = useState(false);
+    const [productModalVisible, setProductModalVisible] = useState(false);
+
+    // Edit Line Item Modal
+    const [editItemModalVisible, setEditItemModalVisible] = useState(false);
+    const [editingItem, setEditingItem] = useState(null); // Copy of the item being edited
+
+    // Static Options Selection
+    const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+    const [pendingProduct, setPendingProduct] = useState(null); // { product, variable }
+    const [selectedOptions, setSelectedOptions] = useState({}); // { 'Color': 'Red' }
+
+    const total = useMemo(() => {
+
+        const confirmAddProductWithOptions = () => {
+            // Validate that all options are selected
+            const missingOptions = pendingProduct.product.staticOptions.filter(opt => !selectedOptions[opt.name]);
+            if (missingOptions.length > 0) {
+                alert(`Please select ${missingOptions.map(o => o.name).join(', ')}`);
+                return;
+            }
+            addProductToInvoice(pendingProduct.product, pendingProduct.variable, selectedOptions);
+            setOptionsModalVisible(false);
+            setPendingProduct(null);
+        };
+
+        const addProductToInvoice = (product, variable, options) => {
+            const price = variable ? (variable.salePrice || variable.price) : (product.salePrice || product.price);
+            let name = variable ? `${product.name} (${variable.name})` : product.name;
+
+            // Append options to name
+            const optionString = Object.entries(options).map(([key, value]) => `${key}: ${value}`).join(', ');
+            if (optionString) {
+                name += ` [${optionString}]`;
+            }
+
+            // Check if the same product+variable+options already exists
+            const existingItemIndex = selectedProducts.findIndex(item =>
+                item.productId === product.id &&
+                item.variableId === variable?.id &&
+                JSON.stringify(item.selectedOptions) === JSON.stringify(options)
+            );
+
+            if (existingItemIndex !== -1) {
+                // Item exists, increment quantity
+                const updatedProducts = [...selectedProducts];
+                updatedProducts[existingItemIndex] = {
+                    ...updatedProducts[existingItemIndex],
+                    quantity: updatedProducts[existingItemIndex].quantity + 1
+                };
+                setSelectedProducts(updatedProducts);
+            } else {
+                // Item doesn't exist, add new
+                setSelectedProducts([...selectedProducts, {
+                    id: Date.now().toString(), // unique id for this line item
+                    productId: product.id,
+                    variableId: variable?.id,
+                    name,
+                    price: price || '0',
+                    quantity: 1,
+                    discount: '0',
+                    extraCharges: '0',
+                    note: '',
+                    selectedOptions: options, // Store for reference if needed
+                    variableAttributes: variable?.attributes, // Store attributes for formatting (e.g. Width, Height)
+                    productName: product.name // Store original product name to avoid parsing issues in preview
+                }]);
+            }
+        };
+
+        const updateLineItem = (id, field, value) => {
+            setSelectedProducts(selectedProducts.map(item => item.id === id ? { ...item, [field]: value } : item));
+        };
+
+        const removeLineItem = (id) => {
+            setSelectedProducts(selectedProducts.filter(item => item.id !== id));
+        };
+
+        const openEditModal = (item) => {
+            setEditingItem({ ...item });
+            setEditItemModalVisible(true);
+        };
+
+        const saveEditedItem = () => {
+            setSelectedProducts(selectedProducts.map(item => item.id === editingItem.id ? editingItem : item));
+            setEditItemModalVisible(false);
+            setEditingItem(null);
+        };
+
+        const handleSave = () => {
+            if (!selectedCustomer) {
+                alert('Please select a customer');
+                return;
+            }
+            if (selectedProducts.length === 0) {
+                alert('Please add at least one product');
+                return;
+            }
+
+            const invoiceData = {
+                customerId: selectedCustomer.id,
+                customerName: selectedCustomer.name,
+                items: selectedProducts,
+                total,
+                note,
+                deliveryInfo
+            };
+
+            if (editingInvoice) {
+                updateInvoice(editingInvoice.id, invoiceData);
+            } else {
+                addInvoice(invoiceData);
+            }
+            navigation.goBack();
+        };
+
+        return (
+            <View style={styles.container}>
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    {/* Customer Section */}
+                    <Card style={styles.card}>
+                        <Card.Title title="Customer" />
+                        <Card.Content>
+                            {selectedCustomer ? (
+                                <View>
+                                    <Text variant="titleMedium">{selectedCustomer.name}</Text>
+                                    <Text>{selectedCustomer.phone}</Text>
+                                    <Text>{selectedCustomer.address}</Text>
+                                    <Button onPress={() => setCustomerModalVisible(true)}>Change</Button>
+                                </View>
+                            ) : (
+                                <Button mode="outlined" onPress={() => setCustomerModalVisible(true)}>Select Customer</Button>
+                            )}
+                        </Card.Content>
+                    </Card>
+
+                    {/* Products Section */}
+                    <Card style={styles.card}>
+                        <Card.Title title="Products" right={(props) => <Button onPress={() => setProductModalVisible(true)}>Add</Button>} />
+                        <Card.Content>
+                            {selectedProducts.map((item) => (
+                                <View key={item.id}>
+                                    <View style={styles.lineItem}>
+                                        <View style={{ flex: 2 }}>
+                                            <Text style={{ fontWeight: 'bold' }}>{item.name}</Text>
+                                            <Text>Price: ${item.price}</Text>
+                                            {item.note ? <Text style={{ fontStyle: 'italic', color: '#666' }}>Note: {item.note}</Text> : null}
+                                            {(parseFloat(item.extraCharges) > 0 || parseFloat(item.discount) > 0) && (
+                                                <Text style={{ fontSize: 12, color: '#666' }}>
+                                                    {parseFloat(item.extraCharges) > 0 ? `+ Extras: $${item.extraCharges} ` : ''}
+                                                    {parseFloat(item.discount) > 0 ? `- Disc: $${item.discount}` : ''}
+                                                </Text>
+                                            )}
+                                        </View>
+                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                            <IconButton icon="minus" size={20} onPress={() => updateLineItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} />
+                                            <Text>{item.quantity}</Text>
+                                            <IconButton icon="plus" size={20} onPress={() => updateLineItem(item.id, 'quantity', item.quantity + 1)} />
+                                        </View>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={{ fontWeight: 'bold' }}>
+                                                ${((item.price * item.quantity) + parseFloat(item.extraCharges || 0) - parseFloat(item.discount || 0)).toFixed(2)}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row' }}>
+                                                <IconButton icon="pencil" size={20} onPress={() => openEditModal(item)} />
+                                                <IconButton icon="delete" size={20} iconColor="red" onPress={() => removeLineItem(item.id)} />
+                                            </View>
+                                        </View>
+                                    </View>
+                                    <Divider />
+                                </View>
+                            ))}
+                            <View style={styles.totalRow}>
+                                <Text variant="titleLarge">Total:</Text>
+                                <Text variant="titleLarge">${total}</Text>
+                            </View>
+                        </Card.Content>
+                    </Card>
+
+                    {/* Additional Info */}
+                    <Card style={styles.card}>
+                        <Card.Content>
+                            <TextInput
+                                label="Note (Optional)"
+                                value={note}
+                                onChangeText={setNote}
+                                mode="outlined"
+                                style={styles.input}
+                            />
+                            <TextInput
+                                label="Delivery Info (Optional)"
+                                value={deliveryInfo}
+                                onChangeText={setDeliveryInfo}
+                                mode="outlined"
+                                style={styles.input}
+                            />
+                        </Card.Content>
+                    </Card>
+                </ScrollView>
+
+                <View style={styles.footer}>
+                    <Button mode="contained" onPress={handleSave} style={styles.saveButton}>
+                        Create Invoice
+                    </Button>
+                </View>
+
+                {/* Customer Selection Modal */}
+                <Portal>
+                    <Modal visible={customerModalVisible} onDismiss={() => setCustomerModalVisible(false)} contentContainerStyle={styles.modalContent}>
+                        <Text variant="titleLarge" style={{ marginBottom: 10 }}>Select Customer</Text>
+                        <FlatList
+                            data={customers}
+                            keyExtractor={(item) => item.id}
+                            renderItem={({ item }) => (
+                                <List.Item
+                                    title={item.name}
+                                    description={item.phone}
+                                    onPress={() => {
+                                        setSelectedCustomer(item);
+                                        setCustomerModalVisible(false);
+                                    }}
+                                />
+                            )}
+                        />
+                        <Button onPress={() => navigation.navigate('CustomerForm')}>Add New Customer</Button>
+                    </Modal>
+                </Portal>
+
+                {/* Product Selection Modal */}
+                <Portal>
+                    <Modal visible={productModalVisible} onDismiss={() => setProductModalVisible(false)} contentContainerStyle={styles.modalContent}>
+                        <Text variant="titleLarge" style={{ marginBottom: 10 }}>Select Product</Text>
+                        <FlatList
+                            data={products}
+                            keyExtractor={(item) => item.id}
+                            renderItem={({ item }) => (
+                                <List.Accordion
+                                    title={item.name}
+                                    description={`$${item.price}`}
+                                    onPress={() => {
+                                        if (!item.variables || item.variables.length === 0) {
+                                            initiateAddProduct(item);
+                                        }
+                                    }}
+                                >
+                                    {item.variables && item.variables.map(v => (
+                                        <List.Item
+                                            key={v.id}
+                                            title={`${v.name} - $${v.salePrice || v.price}`}
+                                            onPress={() => initiateAddProduct(item, v)}
+                                        />
+                                    ))}
+                                </List.Accordion>
+                            )}
+                        />
+                    </Modal>
+                </Portal>
+
+                {/* Static Options Selection Modal */}
+                <Portal>
+                    <Modal visible={optionsModalVisible} onDismiss={() => setOptionsModalVisible(false)} contentContainerStyle={styles.modalContent}>
+                        <Text variant="titleLarge" style={{ marginBottom: 10 }}>Select Options</Text>
+                        <ScrollView>
+                            {pendingProduct?.product.staticOptions?.map(option => (
+                                <View key={option.id} style={{ marginBottom: 15 }}>
+                                    <Text variant="titleMedium">{option.name}</Text>
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                                        {option.values.map(val => (
+                                            <Button
+                                                key={val}
+                                                mode={selectedOptions[option.name] === val ? 'contained' : 'outlined'}
+                                                onPress={() => setSelectedOptions({ ...selectedOptions, [option.name]: val })}
+                                                style={{ marginRight: 5, marginBottom: 5 }}
+                                                compact
+                                            >
+                                                {val}
+                                            </Button>
+                                        ))}
+                                    </View>
+                                </View>
+                            ))}
+                        </ScrollView>
+                        <Button mode="contained" onPress={confirmAddProductWithOptions} style={{ marginTop: 10 }}>
+                            Confirm
+                        </Button>
+                    </Modal>
+                </Portal>
+
+                {/* Edit Line Item Modal */}
+                <Portal>
+                    <Modal visible={editItemModalVisible} onDismiss={() => setEditItemModalVisible(false)} contentContainerStyle={styles.modalContent}>
+                        <Text variant="titleLarge" style={{ marginBottom: 10 }}>Customize Item</Text>
+                        {editingItem && (
+                            <View>
+                                <Text style={{ marginBottom: 10, fontWeight: 'bold' }}>{editingItem.name}</Text>
+                                <TextInput
+                                    label="Discount ($)"
+                                    value={String(editingItem.discount)}
+                                    onChangeText={(text) => setEditingItem({ ...editingItem, discount: text })}
+                                    keyboardType="numeric"
+                                    mode="outlined"
+                                    style={styles.input}
+                                />
+                                <TextInput
+                                    label="Extra Charges ($) (e.g. Embroidery)"
+                                    value={String(editingItem.extraCharges)}
+                                    onChangeText={(text) => setEditingItem({ ...editingItem, extraCharges: text })}
+                                    keyboardType="numeric"
+                                    mode="outlined"
+                                    style={styles.input}
+                                />
+                                <TextInput
+                                    label="Item Note"
+                                    value={editingItem.note}
+                                    onChangeText={(text) => setEditingItem({ ...editingItem, note: text })}
+                                    mode="outlined"
+                                    style={styles.input}
+                                />
+                                <Button mode="contained" onPress={saveEditedItem} style={{ marginTop: 10 }}>
+                                    Save Changes
+                                </Button>
+                            </View>
+                        )}
+                    </Modal>
+                </Portal>
+            </View>
+        );
+    }
+
+const styles = StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: '#f5f5f5',
+        },
+        scrollContent: {
+            padding: 10,
+            paddingBottom: 80,
+        },
+        card: {
+            marginBottom: 10,
+        },
+        input: {
+            marginBottom: 10,
+        },
+        lineItem: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginVertical: 5,
+            paddingVertical: 5,
+        },
+        totalRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: 10,
+        },
+        footer: {
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: 10,
+            backgroundColor: '#fff',
+            elevation: 4,
+        },
+        saveButton: {
+            width: '100%',
+        },
+        modalContent: {
+            backgroundColor: 'white',
+            padding: 20,
+            margin: 20,
+            borderRadius: 10,
+            maxHeight: '80%',
+        },
+    });
