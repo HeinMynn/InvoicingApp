@@ -1,20 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Image, ScrollView } from 'react-native';
-import { TextInput, Button, Text } from 'react-native-paper';
+import React, { useState } from 'react';
+import { View, StyleSheet, Image, ScrollView, Alert } from 'react-native';
+import { TextInput, Button, Text, Divider, useTheme } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../store/useStore';
 
 export default function ShopSettingsScreen({ navigation }) {
     const shopInfo = useStore((state) => state.shopInfo);
     const updateShopInfo = useStore((state) => state.updateShopInfo);
+    const theme = useTheme();
 
     const [name, setName] = useState(shopInfo.name || '');
+    const [nameBurmese, setNameBurmese] = useState(shopInfo.nameBurmese || '');
+    const [tagline, setTagline] = useState(shopInfo.tagline || '');
     const [address, setAddress] = useState(shopInfo.address || '');
     const [phone, setPhone] = useState(shopInfo.phone || '');
     const [logo, setLogo] = useState(shopInfo.logo || null);
 
     const pickImage = async () => {
-        // No permissions request is necessary for launching the image library
         let result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
@@ -28,50 +30,81 @@ export default function ShopSettingsScreen({ navigation }) {
     };
 
     const handleSave = () => {
-        updateShopInfo({ name, address, phone, logo });
-        navigation.goBack();
+        updateShopInfo({ name, nameBurmese, tagline, address, phone, logo });
+        Alert.alert('Success', 'Shop information saved successfully');
     };
 
     return (
-        <ScrollView contentContainerStyle={styles.container}>
-            <View style={styles.logoContainer}>
-                {logo ? (
-                    <Image source={{ uri: logo }} style={styles.logo} />
-                ) : (
-                    <View style={styles.placeholderLogo}>
-                        <Text>No Logo</Text>
-                    </View>
-                )}
-                <Button onPress={pickImage}>Select Logo</Button>
+        <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <View style={styles.section}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>Shop Information</Text>
+                <View style={styles.logoContainer}>
+                    {logo ? (
+                        <Image source={{ uri: logo }} style={styles.logo} />
+                    ) : (
+                        <View style={styles.placeholderLogo}>
+                            <Text>No Logo</Text>
+                        </View>
+                    )}
+                    <Button onPress={pickImage}>Select Logo</Button>
+                </View>
+
+                <TextInput
+                    label="Shop Name"
+                    value={name}
+                    onChangeText={setName}
+                    style={styles.input}
+                    mode="outlined"
+                />
+                <TextInput
+                    label="Shop Name (Burmese)"
+                    value={nameBurmese}
+                    onChangeText={setNameBurmese}
+                    style={styles.input}
+                    mode="outlined"
+                />
+                <TextInput
+                    label="Tagline"
+                    value={tagline}
+                    onChangeText={setTagline}
+                    style={styles.input}
+                    mode="outlined"
+                    placeholder="e.g., Quality Products Since 2020"
+                />
+                <TextInput
+                    label="Address"
+                    value={address}
+                    onChangeText={setAddress}
+                    style={styles.input}
+                    mode="outlined"
+                    multiline
+                />
+                <TextInput
+                    label="Phone"
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    style={styles.input}
+                    mode="outlined"
+                />
+                <Button mode="contained" onPress={handleSave} style={styles.saveButton}>
+                    Save Shop Information
+                </Button>
             </View>
 
-            <TextInput
-                label="Shop Name"
-                value={name}
-                onChangeText={setName}
-                style={styles.input}
-                mode="outlined"
-            />
-            <TextInput
-                label="Address"
-                value={address}
-                onChangeText={setAddress}
-                style={styles.input}
-                mode="outlined"
-                multiline
-            />
-            <TextInput
-                label="Phone"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                style={styles.input}
-                mode="outlined"
-            />
+            <Divider style={styles.divider} />
 
-            <Button mode="contained" onPress={handleSave} style={styles.button}>
-                Save Settings
-            </Button>
+            <View style={styles.section}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>Advanced</Text>
+                <Button mode="outlined" onPress={() => navigation.navigate('CategoryList')} style={styles.button}>
+                    Manage Categories
+                </Button>
+                <Button mode="outlined" onPress={() => navigation.navigate('AttributeList')} style={styles.button}>
+                    Manage Attributes
+                </Button>
+            </View>
+
+            <View style={{ height: 50 }} />
         </ScrollView>
     );
 }
@@ -79,8 +112,15 @@ export default function ShopSettingsScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         padding: 20,
-        backgroundColor: '#fff',
         flexGrow: 1,
+    },
+    section: {
+        marginBottom: 10,
+    },
+    sectionTitle: {
+        marginBottom: 15,
+        fontWeight: 'bold',
+        color: '#6200ee',
     },
     logoContainer: {
         alignItems: 'center',
@@ -104,7 +144,15 @@ const styles = StyleSheet.create({
     input: {
         marginBottom: 15,
     },
-    button: {
+    saveButton: {
         marginTop: 10,
+    },
+    button: {
+        marginBottom: 10,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#eee',
+        marginVertical: 20,
     },
 });

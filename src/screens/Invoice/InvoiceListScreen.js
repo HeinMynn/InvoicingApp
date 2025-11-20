@@ -1,12 +1,49 @@
 import React from 'react';
 import { View, FlatList, StyleSheet, Alert } from 'react-native';
-import { List, FAB, Text, IconButton } from 'react-native-paper';
+import { List, FAB, Text, IconButton, useTheme, Divider, Button, Portal, Modal, Card } from 'react-native-paper';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useStore } from '../../store/useStore';
+import { useCurrency } from '../../hooks/useCurrency';
 
 export default function InvoiceListScreen({ navigation }) {
     const invoices = useStore((state) => state.invoices);
     const deleteInvoice = useStore((state) => state.deleteInvoice);
+    const theme = useTheme();
+    const currency = useCurrency();
+
+    // Filter State
+    const [selectedMonth, setSelectedMonth] = React.useState(null); // null = All
+    const [selectedYear, setSelectedYear] = React.useState(null); // null = All
+    const [monthMenuVisible, setMonthMenuVisible] = React.useState(false);
+    const [yearMenuVisible, setYearMenuVisible] = React.useState(false);
+
+    const months = [
+        { label: 'All Months', value: null },
+        { label: 'January', value: 0 }, { label: 'February', value: 1 },
+        { label: 'March', value: 2 }, { label: 'April', value: 3 },
+        { label: 'May', value: 4 }, { label: 'June', value: 5 },
+        { label: 'July', value: 6 }, { label: 'August', value: 7 },
+        { label: 'September', value: 8 }, { label: 'October', value: 9 },
+        { label: 'November', value: 10 }, { label: 'December', value: 11 }
+    ];
+
+    const years = React.useMemo(() => {
+        const currentYear = new Date().getFullYear();
+        const yearList = [{ label: 'All Years', value: null }];
+        for (let i = 0; i < 5; i++) {
+            yearList.push({ label: (currentYear - i).toString(), value: currentYear - i });
+        }
+        return yearList;
+    }, []);
+
+    const filteredInvoices = React.useMemo(() => {
+        return invoices.filter(inv => {
+            const d = new Date(inv.date);
+            const matchMonth = selectedMonth === null || d.getMonth() === selectedMonth;
+            const matchYear = selectedYear === null || d.getFullYear() === selectedYear;
+            return matchMonth && matchYear;
+        }).sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort by date desc
+    }, [invoices, selectedMonth, selectedYear]);
 
     const handleDelete = (id) => {
         Alert.alert(
@@ -19,21 +56,35 @@ export default function InvoiceListScreen({ navigation }) {
         );
     };
 
-    const renderRightActions = (item) => {
+    let rowRefs = new Map();
+
+    const closeRow = (id) => {
+        [...rowRefs.entries()].forEach(([key, ref]) => {
+            if (key !== id && ref) ref.close();
+        });
+    };
+
+    const renderRightActions = (item, ref) => {
         return (
             <View style={styles.swipeActions}>
                 <View style={styles.editAction}>
                     <IconButton
                         icon="pencil"
                         iconColor="white"
-                        onPress={() => navigation.navigate('CreateInvoice', { invoice: item })}
+                        onPress={() => {
+                            ref.close();
+                            navigation.navigate('CreateInvoice', { invoice: item });
+                        }}
                     />
                 </View>
                 <View style={styles.deleteAction}>
                     <IconButton
                         icon="delete"
                         iconColor="white"
-                        onPress={() => handleDelete(item.id)}
+                        onPress={() => {
+                            ref.close();
+                            handleDelete(item.id);
+                        }}
                     />
                 </View>
             </View>
@@ -41,28 +92,98 @@ export default function InvoiceListScreen({ navigation }) {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            {/* Filters */}
+            <View style={styles.filterContainer}>
+                <Button
+                    mode="outlined"
+                    onPress={() => setMonthMenuVisible(true)}
+                    style={styles.filterButton}
+                >
+                    {selectedMonth === null ? 'All Months' : months.find(m => m.value === selectedMonth)?.label}
+                </Button>
+                <Button
+                    mode="outlined"
+                    onPress={() => setYearMenuVisible(true)}
+                    style={styles.filterButton}
+                >
+                    {selectedYear === null ? 'All Years' : selectedYear}
+                </Button>
+            </View>
+
             <FlatList
-                data={invoices}
+                data={filteredInvoices}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
-                    <Swipeable renderRightActions={() => renderRightActions(item)}>
+                    <Swipeable
+                        ref={(ref) => {
+                            if (ref && !rowRefs.get(item.id)) {
+                                rowRefs.set(item.id, ref);
+                            }
+                        }}
+                        onSwipeableWillOpen={() => closeRow(item.id)}
+                        renderRightActions={() => renderRightActions(item, rowRefs.get(item.id))}
+                    >
                         <List.Item
-                            title={`Invoice #${item.id.slice(-4)}`}
-                            description={`Customer: ${item.customerName} | Total: $${item.total}`}
+                            title={`Invoice #${item.id}`}
+                            description={`Customer: ${item.customerName} | Total: ${item.total} ${currency}`}
                             right={(props) => <Text {...props} style={{ alignSelf: 'center' }}>{new Date(item.date).toLocaleDateString()}</Text>}
                             onPress={() => navigation.navigate('InvoicePreview', { invoice: item })}
-                            style={{ backgroundColor: 'white' }}
                         />
                     </Swipeable>
                 )}
                 ListEmptyComponent={<Text style={styles.empty}>No invoices found</Text>}
+                ItemSeparatorComponent={() => <Divider />}
             />
             <FAB
                 style={styles.fab}
                 icon="plus"
                 onPress={() => navigation.navigate('CreateInvoice')}
             />
+
+            {/* Month Modal */}
+            <Portal>
+                <Modal visible={monthMenuVisible} onDismiss={() => setMonthMenuVisible(false)} contentContainerStyle={styles.modalContainer}>
+                    <Card>
+                        <Card.Title title="Select Month" />
+                        <Card.Content>
+                            {months.map((m) => (
+                                <List.Item
+                                    key={m.label}
+                                    title={m.label}
+                                    onPress={() => {
+                                        setSelectedMonth(m.value);
+                                        setMonthMenuVisible(false);
+                                    }}
+                                    right={props => selectedMonth === m.value ? <List.Icon {...props} icon="check" /> : null}
+                                />
+                            ))}
+                        </Card.Content>
+                    </Card>
+                </Modal>
+            </Portal>
+
+            {/* Year Modal */}
+            <Portal>
+                <Modal visible={yearMenuVisible} onDismiss={() => setYearMenuVisible(false)} contentContainerStyle={styles.modalContainer}>
+                    <Card>
+                        <Card.Title title="Select Year" />
+                        <Card.Content>
+                            {years.map((y) => (
+                                <List.Item
+                                    key={y.label}
+                                    title={y.label}
+                                    onPress={() => {
+                                        setSelectedYear(y.value);
+                                        setYearMenuVisible(false);
+                                    }}
+                                    right={props => selectedYear === y.value ? <List.Icon {...props} icon="check" /> : null}
+                                />
+                            ))}
+                        </Card.Content>
+                    </Card>
+                </Modal>
+            </Portal>
         </View>
     );
 }
@@ -70,7 +191,15 @@ export default function InvoiceListScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+    },
+    filterContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: 10,
+    },
+    filterButton: {
+        flex: 1,
+        marginHorizontal: 5,
     },
     fab: {
         position: 'absolute',
@@ -97,5 +226,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         width: 80,
+    },
+    modalContainer: {
+        padding: 20,
+        maxHeight: '80%',
     },
 });

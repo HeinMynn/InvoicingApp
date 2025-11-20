@@ -1,13 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, Dimensions } from 'react-native';
-import { Text, Button, Card } from 'react-native-paper';
+import { Text, Button, Card, useTheme } from 'react-native-paper';
 import { useStore } from '../store/useStore';
+import { useCurrency } from '../hooks/useCurrency';
 
 export default function DashboardScreen({ navigation }) {
     const logout = useStore((state) => state.logout);
     const invoices = useStore((state) => state.invoices);
     const customers = useStore((state) => state.customers);
     const products = useStore((state) => state.products);
+    const [showThisMonth, setShowThisMonth] = useState(true);
+    const theme = useTheme();
+    const currency = useCurrency();
 
     // Calculate statistics
     const stats = useMemo(() => {
@@ -16,14 +20,14 @@ export default function DashboardScreen({ navigation }) {
         const customerCount = customers.length;
         const productCount = products.length;
 
-        // Get last 30 days revenue
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const recentRevenue = invoices
-            .filter(inv => new Date(inv.date) >= thirtyDaysAgo)
+        // Get current month revenue
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const currentMonthRevenue = invoices
+            .filter(inv => new Date(inv.date) >= startOfMonth)
             .reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
 
-        return { totalRevenue, invoiceCount, customerCount, productCount, recentRevenue };
+        return { totalRevenue, invoiceCount, customerCount, productCount, currentMonthRevenue };
     }, [invoices, customers, products]);
 
     // Get recent invoices
@@ -56,21 +60,20 @@ export default function DashboardScreen({ navigation }) {
     }, [invoices]);
 
     return (
-        <ScrollView style={styles.container}>
+        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <Text variant="headlineMedium" style={styles.title}>Dashboard</Text>
 
             {/* Statistics Cards */}
             <View style={styles.statsRow}>
-                <Card style={styles.statCard}>
+                <Card style={styles.card} onPress={() => setShowThisMonth(!showThisMonth)}>
                     <Card.Content>
-                        <Text variant="titleSmall" style={styles.statLabel}>Total Revenue</Text>
-                        <Text variant="headlineMedium" style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>${stats.totalRevenue.toFixed(0)}</Text>
-                    </Card.Content>
-                </Card>
-                <Card style={styles.statCard}>
-                    <Card.Content>
-                        <Text variant="titleSmall" style={styles.statLabel}>Invoices</Text>
-                        <Text variant="headlineMedium" style={styles.statValue} numberOfLines={1}>{stats.invoiceCount}</Text>
+                        <Text variant="titleMedium">
+                            {showThisMonth ? 'This Month Revenue' : 'Total Revenue'}
+                        </Text>
+                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>{currency}</Text>
+                        <Text variant="displayMedium" style={styles.revenue} numberOfLines={1} adjustsFontSizeToFit>
+                            {showThisMonth ? stats.currentMonthRevenue.toFixed(0) : stats.totalRevenue.toFixed(0)}
+                        </Text>
                     </Card.Content>
                 </Card>
             </View>
@@ -97,7 +100,8 @@ export default function DashboardScreen({ navigation }) {
                     <View style={styles.chart}>
                         {chartData.days.map((day, index) => (
                             <View key={index} style={styles.barContainer}>
-                                <Text style={styles.barValue}>${day.revenue > 0 ? day.revenue.toFixed(0) : ''}</Text>
+                                <Text style={[styles.barValue, { fontSize: 9 }]}>{currency}</Text>
+                                <Text style={styles.barValue}>{day.revenue > 0 ? day.revenue.toFixed(0) : ''}</Text>
                                 <View
                                     style={[
                                         styles.bar,
@@ -124,7 +128,10 @@ export default function DashboardScreen({ navigation }) {
                                     <Text variant="titleSmall">Invoice #{invoice.id.slice(-4)}</Text>
                                     <Text variant="bodySmall" style={{ color: '#666' }}>{invoice.customerName}</Text>
                                 </View>
-                                <Text variant="titleMedium" style={{ color: '#6200ee' }} numberOfLines={1} adjustsFontSizeToFit>${Math.round(invoice.total)}</Text>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>{currency}</Text>
+                                    <Text variant="titleMedium" style={{ color: '#6200ee' }} numberOfLines={1} adjustsFontSizeToFit>{Math.round(invoice.total)}</Text>
+                                </View>
                             </View>
                         ))
                     )}
@@ -135,6 +142,9 @@ export default function DashboardScreen({ navigation }) {
             <View style={styles.actionsContainer}>
                 <Button mode="contained" onPress={() => navigation.navigate('CreateInvoice')} style={styles.button} icon="plus">
                     New Invoice
+                </Button>
+                <Button mode="outlined" onPress={() => navigation.navigate('Reports')} style={styles.button} icon="chart-bar">
+                    View Full Reports
                 </Button>
                 <Button mode="outlined" onPress={logout} style={styles.logoutButton}>
                     Logout
@@ -147,7 +157,6 @@ export default function DashboardScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
     },
     title: {
         padding: 20,
@@ -162,7 +171,6 @@ const styles = StyleSheet.create({
     statCard: {
         flex: 1,
         marginHorizontal: 5,
-        backgroundColor: 'white',
     },
     statLabel: {
         color: '#666',
@@ -175,7 +183,6 @@ const styles = StyleSheet.create({
     chartCard: {
         margin: 20,
         marginTop: 10,
-        backgroundColor: 'white',
     },
     chart: {
         flexDirection: 'row',
@@ -208,7 +215,6 @@ const styles = StyleSheet.create({
     recentCard: {
         margin: 20,
         marginTop: 0,
-        backgroundColor: 'white',
     },
     invoiceItem: {
         flexDirection: 'row',

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, FlatList, StyleSheet, Alert } from 'react-native';
-import { List, FAB, Text, IconButton, Portal, Modal, Divider } from 'react-native-paper';
+import { List, FAB, Text, IconButton, Portal, Modal, Divider, useTheme, Searchbar } from 'react-native-paper';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useStore } from '../../store/useStore';
 
@@ -8,9 +8,16 @@ export default function CustomerListScreen({ navigation }) {
     const customers = useStore((state) => state.customers);
     const invoices = useStore((state) => state.invoices);
     const deleteCustomer = useStore((state) => state.deleteCustomer);
+    const theme = useTheme();
 
     const [previewModalVisible, setPreviewModalVisible] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredCustomers = customers.filter(customer =>
+        customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        customer.phone.includes(searchQuery)
+    );
 
     const getCustomerInvoices = (customerId) => {
         return invoices.filter(inv => inv.customerId === customerId);
@@ -21,7 +28,7 @@ export default function CustomerListScreen({ navigation }) {
         if (customerInvoices.length > 0) {
             Alert.alert(
                 'Cannot Delete Customer',
-                `This customer has ${customerInvoices.length} invoice(s). Please delete the invoices first.`,
+                `This customer has ${customerInvoices.length} invoice(s).Please delete the invoices first.`,
                 [{ text: 'OK' }]
             );
         } else {
@@ -41,28 +48,45 @@ export default function CustomerListScreen({ navigation }) {
         setPreviewModalVisible(true);
     };
 
-    const renderRightActions = (customer) => {
+    let rowRefs = new Map();
+
+    const closeRow = (id) => {
+        [...rowRefs.entries()].forEach(([key, ref]) => {
+            if (key !== id && ref) ref.close();
+        });
+    };
+
+    const renderRightActions = (customer, ref) => {
         return (
             <View style={styles.swipeActions}>
                 <View style={styles.previewAction}>
                     <IconButton
                         icon="account"
                         iconColor="white"
-                        onPress={() => handlePreview(customer)}
+                        onPress={() => {
+                            ref.close();
+                            handlePreview(customer);
+                        }}
                     />
                 </View>
                 <View style={styles.editAction}>
                     <IconButton
                         icon="pencil"
                         iconColor="white"
-                        onPress={() => navigation.navigate('CustomerForm', { customer })}
+                        onPress={() => {
+                            ref.close();
+                            navigation.navigate('CustomerForm', { customer });
+                        }}
                     />
                 </View>
                 <View style={styles.deleteAction}>
                     <IconButton
                         icon="delete"
                         iconColor="white"
-                        onPress={() => handleDelete(customer)}
+                        onPress={() => {
+                            ref.close();
+                            handleDelete(customer);
+                        }}
                     />
                 </View>
             </View>
@@ -70,25 +94,44 @@ export default function CustomerListScreen({ navigation }) {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <Searchbar
+                placeholder="Search customers..."
+                onChangeText={setSearchQuery}
+                value={searchQuery}
+                style={styles.searchBar}
+            />
             <FlatList
-                data={customers}
+                data={filteredCustomers}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => {
                     const customerInvoices = getCustomerInvoices(item.id);
                     return (
-                        <Swipeable renderRightActions={() => renderRightActions(item)}>
+                        <Swipeable
+                            ref={(ref) => {
+                                if (ref && !rowRefs.get(item.id)) {
+                                    rowRefs.set(item.id, ref);
+                                }
+                            }}
+                            onSwipeableWillOpen={() => closeRow(item.id)}
+                            renderRightActions={() => renderRightActions(item, rowRefs.get(item.id))}
+                        >
                             <List.Item
                                 title={item.name}
-                                description={`${item.phone} - ${item.address}\n${customerInvoices.length} invoice(s)`}
+                                description={`${item.phone}${item.address ? ` - ${item.address}` : ''}\n${customerInvoices.length} invoice(s)`}
+                                descriptionNumberOfLines={3}
+                                left={(props) => <List.Icon {...props} icon="account" />}
                                 right={(props) => <List.Icon {...props} icon="chevron-right" />}
-                                onPress={() => navigation.navigate('CustomerInvoices', { customer: item })}
-                                style={{ backgroundColor: 'white' }}
+                                onPress={() => {
+                                    // Close swipeable if open? Maybe not needed for simple press
+                                    navigation.navigate('CustomerInvoices', { customer: item });
+                                }}
                             />
                         </Swipeable>
                     );
                 }}
                 ListEmptyComponent={<Text style={styles.empty}>No customers found</Text>}
+                ItemSeparatorComponent={() => <Divider />}
             />
             <FAB
                 style={styles.fab}
@@ -133,7 +176,10 @@ export default function CustomerListScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+    },
+    searchBar: {
+        margin: 10,
+        elevation: 2,
     },
     fab: {
         position: 'absolute',
@@ -168,7 +214,6 @@ const styles = StyleSheet.create({
         width: 80,
     },
     modalContent: {
-        backgroundColor: 'white',
         padding: 20,
         margin: 20,
         borderRadius: 10,

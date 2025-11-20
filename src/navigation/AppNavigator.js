@@ -53,11 +53,33 @@ function MainTabs() {
     );
 }
 
+const linking = {
+    prefixes: ['invoicingapp://'],
+    config: {
+        screens: {
+            Main: {
+                screens: {
+                    Dashboard: 'dashboard',
+                    Invoices: 'invoices',
+                    Products: 'products',
+                    Customers: 'customers',
+                },
+            },
+            CreateInvoice: 'invoice/create',
+            Reports: 'reports',
+            GeneralSettings: 'settings',
+            ShopSettings: 'shop-settings',
+            ProductForm: 'product/form',
+            CustomerForm: 'customer/form',
+        },
+    },
+};
+
 export default function AppNavigator() {
     const user = useStore((state) => state.user);
 
     return (
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
             <Stack.Navigator screenOptions={{ headerShown: true }}>
                 {!user ? (
                     <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
@@ -70,11 +92,18 @@ export default function AppNavigator() {
                                 headerShown: true,
                                 title: 'Invoicing App',
                                 headerRight: () => (
-                                    <IconButton
-                                        icon="store"
-                                        iconColor="#6200ee"
-                                        onPress={() => navigation.navigate('ShopSettings')}
-                                    />
+                                    <>
+                                        <IconButton
+                                            icon="cog"
+                                            iconColor="#6200ee"
+                                            onPress={() => navigation.navigate('GeneralSettings')}
+                                        />
+                                        <IconButton
+                                            icon="store"
+                                            iconColor="#6200ee"
+                                            onPress={() => navigation.navigate('ShopSettings')}
+                                        />
+                                    </>
                                 ),
                             })}
                         />
@@ -83,7 +112,15 @@ export default function AppNavigator() {
                         <Stack.Screen name="ProductForm" getComponent={() => require('../screens/Product/ProductFormScreen').default} />
                         <Stack.Screen name="CreateInvoice" getComponent={() => require('../screens/Invoice/CreateInvoiceScreen').default} />
                         <Stack.Screen name="InvoicePreview" getComponent={() => require('../screens/Invoice/InvoicePreviewScreen').default} />
-                        <Stack.Screen name="ShopSettings" getComponent={() => require('../screens/ShopSettingsScreen').default} />
+                        <Stack.Screen name="ShopSettings" getComponent={() => require('../screens/ShopSettingsScreen').default} options={{ title: 'Shop Settings' }} />
+                        <Stack.Screen name="GeneralSettings" getComponent={() => require('../screens/GeneralSettingsScreen').default} options={{ title: 'General Settings' }} />
+
+                        <Stack.Screen name="CategoryList" getComponent={() => require('../screens/Category/CategoryListScreen').default} options={{ title: 'Categories' }} />
+                        <Stack.Screen name="CategoryForm" getComponent={() => require('../screens/Category/CategoryFormScreen').default} options={{ title: 'Category' }} />
+
+                        <Stack.Screen name="AttributeList" getComponent={() => require('../screens/Attribute/AttributeListScreen').default} options={{ title: 'Attributes' }} />
+                        <Stack.Screen name="AttributeForm" getComponent={() => require('../screens/Attribute/AttributeFormScreen').default} options={{ title: 'Attribute' }} />
+                        <Stack.Screen name="Reports" getComponent={() => require('../screens/ReportScreen').default} options={{ title: 'Sales Reports' }} />
                     </>
                 )}
             </Stack.Navigator>

@@ -1,13 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, FlatList } from 'react-native';
-import { TextInput, Button, Text, Card, IconButton, Menu, Divider, Portal, Modal, List, HelperText } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { TextInput, Button, Text, Card, IconButton, Menu, Divider, Portal, Modal, List, HelperText, useTheme } from 'react-native-paper';
 import { useStore } from '../../store/useStore';
+import { useCurrency } from '../../hooks/useCurrency';
 
 export default function CreateInvoiceScreen({ navigation, route }) {
     const customers = useStore((state) => state.customers);
     const products = useStore((state) => state.products);
     const addInvoice = useStore((state) => state.addInvoice);
     const updateInvoice = useStore((state) => state.updateInvoice);
+    const theme = useTheme();
+    const currency = useCurrency();
 
     const editingInvoice = route.params?.invoice; // If provided, we're editing
 
@@ -15,8 +18,10 @@ export default function CreateInvoiceScreen({ navigation, route }) {
     const [selectedProducts, setSelectedProducts] = useState([]);
     const [note, setNote] = useState('');
     const [deliveryInfo, setDeliveryInfo] = useState('');
+    const [gateName, setGateName] = useState('');
+    const [deposit, setDeposit] = useState('0');
+    const [deliveryMenuVisible, setDeliveryMenuVisible] = useState(false);
 
-    // Populate form when editing
     useEffect(() => {
         if (editingInvoice) {
             const customer = customers.find(c => c.id === editingInvoice.customerId);
@@ -24,16 +29,26 @@ export default function CreateInvoiceScreen({ navigation, route }) {
             setSelectedProducts(editingInvoice.items || []);
             setNote(editingInvoice.note || '');
             setDeliveryInfo(editingInvoice.deliveryInfo || '');
+            setGateName(editingInvoice.gateName || '');
+            setDeposit(editingInvoice.deposit || '0');
         }
     }, [editingInvoice]);
 
     // Modal States
     const [customerModalVisible, setCustomerModalVisible] = useState(false);
     const [productModalVisible, setProductModalVisible] = useState(false);
+    const [productSearchQuery, setProductSearchQuery] = useState('');
 
-    // Edit Line Item Modal
-    const [editItemModalVisible, setEditItemModalVisible] = useState(false);
+    const filteredProducts = useMemo(() => {
+        if (!productSearchQuery) return products;
+        return products.filter(p =>
+            p.name.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
+            (p.variables && p.variables.some(v => v.name && v.name.toLowerCase().includes(productSearchQuery.toLowerCase())))
+        );
+    }, [products, productSearchQuery]);
+
     const [editingItem, setEditingItem] = useState(null); // Copy of the item being edited
+    const [editItemModalVisible, setEditItemModalVisible] = useState(false);
 
     // Static Options Selection
     const [optionsModalVisible, setOptionsModalVisible] = useState(false);
@@ -44,7 +59,7 @@ export default function CreateInvoiceScreen({ navigation, route }) {
         return selectedProducts.reduce((sum, item) => {
             const lineTotal = (parseFloat(item.price) * item.quantity) + (parseFloat(item.extraCharges || 0)) - (parseFloat(item.discount || 0));
             return sum + lineTotal;
-        }, 0).toFixed(2);
+        }, 0);
     }, [selectedProducts]);
 
     const initiateAddProduct = (product, variable = null) => {
@@ -167,10 +182,14 @@ export default function CreateInvoiceScreen({ navigation, route }) {
         const invoiceData = {
             customerId: selectedCustomer.id,
             customerName: selectedCustomer.name,
+            customerAddress: selectedCustomer.address || '',
+            customerPhone: selectedCustomer.phone || '',
             items: selectedProducts,
             total,
             note,
-            deliveryInfo
+            deliveryInfo,
+            gateName: deliveryInfo === 'ကားဂိတ်ချ' ? gateName : '',
+            deposit: parseFloat(deposit || 0)
         };
 
         if (editingInvoice) {
@@ -182,90 +201,144 @@ export default function CreateInvoiceScreen({ navigation, route }) {
     };
 
     return (
-        <View style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Customer Section */}
-                <Card style={styles.card}>
-                    <Card.Title title="Customer" />
-                    <Card.Content>
-                        {selectedCustomer ? (
-                            <View>
-                                <Text variant="titleMedium">{selectedCustomer.name}</Text>
-                                <Text>{selectedCustomer.phone}</Text>
-                                <Text>{selectedCustomer.address}</Text>
-                                <Button onPress={() => setCustomerModalVisible(true)}>Change</Button>
-                            </View>
-                        ) : (
-                            <Button mode="outlined" onPress={() => setCustomerModalVisible(true)}>Select Customer</Button>
-                        )}
-                    </Card.Content>
-                </Card>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1, backgroundColor: theme.colors.background }}
+                keyboardVerticalOffset={100}
+            >
+                <ScrollView contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}>
+                    {/* Customer Section */}
+                    <Card style={styles.card}>
+                        <Card.Title title="Customer" />
+                        <Card.Content>
+                            {selectedCustomer ? (
+                                <View>
+                                    <Text variant="titleMedium">{selectedCustomer.name}</Text>
+                                    <Text>{selectedCustomer.phone}</Text>
+                                    <Text>{selectedCustomer.address}</Text>
+                                    <Button onPress={() => setCustomerModalVisible(true)}>Change</Button>
+                                </View>
+                            ) : (
+                                <Button mode="outlined" onPress={() => setCustomerModalVisible(true)}>Select Customer</Button>
+                            )}
+                        </Card.Content>
+                    </Card>
 
-                {/* Products Section */}
-                <Card style={styles.card}>
-                    <Card.Title title="Products" right={(props) => <Button onPress={() => setProductModalVisible(true)}>Add</Button>} />
-                    <Card.Content>
-                        {selectedProducts.map((item) => (
-                            <View key={item.id}>
-                                <View style={styles.lineItem}>
-                                    <View style={{ flex: 2 }}>
-                                        <Text style={{ fontWeight: 'bold' }}>{item.name}</Text>
-                                        <Text>Price: ${item.price}</Text>
-                                        {item.note ? <Text style={{ fontStyle: 'italic', color: '#666' }}>Note: {item.note}</Text> : null}
-                                        {(parseFloat(item.extraCharges) > 0 || parseFloat(item.discount) > 0) && (
-                                            <Text style={{ fontSize: 12, color: '#666' }}>
-                                                {parseFloat(item.extraCharges) > 0 ? `+ Extras: $${item.extraCharges} ` : ''}
-                                                {parseFloat(item.discount) > 0 ? `- Disc: $${item.discount}` : ''}
+                    {/* Products Section */}
+                    <Card style={styles.card}>
+                        <Card.Title title="Products" right={(props) => <Button onPress={() => setProductModalVisible(true)}>Add</Button>} />
+                        <Card.Content>
+                            {selectedProducts.map((item) => (
+                                <View key={item.id}>
+                                    <View style={styles.lineItem}>
+                                        <View style={{ flex: 2 }}>
+                                            <Text style={{ fontWeight: 'bold' }}>{item.name}</Text>
+                                            <Text>Price: {item.price} {currency}</Text>
+                                            {item.note ? <Text style={{ fontStyle: 'italic', color: '#666' }}>Note: {item.note}</Text> : null}
+                                            {(parseFloat(item.extraCharges) > 0 || parseFloat(item.discount) > 0) && (
+                                                <Text style={{ fontSize: 12, color: '#666' }}>
+                                                    {parseFloat(item.extraCharges) > 0 ? `+ Extras: ${item.extraCharges} ${currency} ` : ''}
+                                                    {parseFloat(item.discount) > 0 ? `- Disc: ${item.discount} ${currency}` : ''}
+                                                </Text>
+                                            )}
+                                        </View>
+                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                            <IconButton icon="minus" size={20} onPress={() => updateLineItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} />
+                                            <Text>{item.quantity}</Text>
+                                            <IconButton icon="plus" size={20} onPress={() => updateLineItem(item.id, 'quantity', item.quantity + 1)} />
+                                        </View>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={{ fontWeight: 'bold' }}>
+                                                {Math.round((item.price * item.quantity) + parseFloat(item.extraCharges || 0) - parseFloat(item.discount || 0))} {currency}
                                             </Text>
-                                        )}
-                                    </View>
-                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                                        <IconButton icon="minus" size={20} onPress={() => updateLineItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} />
-                                        <Text>{item.quantity}</Text>
-                                        <IconButton icon="plus" size={20} onPress={() => updateLineItem(item.id, 'quantity', item.quantity + 1)} />
-                                    </View>
-                                    <View style={{ alignItems: 'flex-end' }}>
-                                        <Text style={{ fontWeight: 'bold' }}>
-                                            ${((item.price * item.quantity) + parseFloat(item.extraCharges || 0) - parseFloat(item.discount || 0)).toFixed(2)}
-                                        </Text>
-                                        <View style={{ flexDirection: 'row' }}>
-                                            <IconButton icon="pencil" size={20} onPress={() => openEditModal(item)} />
-                                            <IconButton icon="delete" size={20} iconColor="red" onPress={() => removeLineItem(item.id)} />
+                                            <View style={{ flexDirection: 'row' }}>
+                                                <IconButton icon="pencil" size={20} onPress={() => openEditModal(item)} />
+                                                <IconButton icon="delete" size={20} iconColor="red" onPress={() => removeLineItem(item.id)} />
+                                            </View>
                                         </View>
                                     </View>
+                                    <Divider />
                                 </View>
-                                <Divider />
+                            ))}
+                            <View style={styles.totalRow}>
+                                <Text variant="titleLarge">Total:</Text>
+                                <Text variant="titleLarge">{total} {currency}</Text>
                             </View>
-                        ))}
-                        <View style={styles.totalRow}>
-                            <Text variant="titleLarge">Total:</Text>
-                            <Text variant="titleLarge">${total}</Text>
-                        </View>
-                    </Card.Content>
-                </Card>
+                        </Card.Content>
+                    </Card>
 
-                {/* Additional Info */}
-                <Card style={styles.card}>
-                    <Card.Content>
-                        <TextInput
-                            label="Note (Optional)"
-                            value={note}
-                            onChangeText={setNote}
-                            mode="outlined"
-                            style={styles.input}
-                        />
-                        <TextInput
-                            label="Delivery Info (Optional)"
-                            value={deliveryInfo}
-                            onChangeText={setDeliveryInfo}
-                            mode="outlined"
-                            style={styles.input}
-                        />
-                    </Card.Content>
-                </Card>
-            </ScrollView>
+                    {/* Additional Info */}
+                    <Card style={styles.card}>
+                        <Card.Content>
+                            <TextInput
+                                label="Deposit Amount"
+                                value={deposit}
+                                onChangeText={setDeposit}
+                                keyboardType="numeric"
+                                mode="outlined"
+                                style={styles.input}
+                            />
+                            <TextInput
+                                label="Note (Optional)"
+                                value={note}
+                                onChangeText={setNote}
+                                mode="outlined"
+                                style={styles.input}
+                            />
 
-            <View style={styles.footer}>
+                            <TextInput
+                                label="Delivery Service (Optional)"
+                                value={deliveryInfo}
+                                mode="outlined"
+                                editable={false}
+                                right={<TextInput.Icon icon="menu-down" />}
+                                onPressIn={() => {
+                                    Keyboard.dismiss();
+                                    setDeliveryMenuVisible(true);
+                                }}
+                                style={styles.input}
+                            />
+
+                            <Portal>
+                                <Modal
+                                    visible={deliveryMenuVisible}
+                                    onDismiss={() => setDeliveryMenuVisible(false)}
+                                    contentContainerStyle={styles.modalContainer}
+                                >
+                                    <Card>
+                                        <Card.Title title="Select Delivery Service" />
+                                        <Card.Content>
+                                            <List.Item title="Royal Express" onPress={() => { setDeliveryInfo('Royal Express'); setDeliveryMenuVisible(false); }} />
+                                            <List.Item title="ကားဂိတ်ချ" onPress={() => { setDeliveryInfo('ကားဂိတ်ချ'); setDeliveryMenuVisible(false); }} />
+                                            <List.Item title="Bee Express" onPress={() => { setDeliveryInfo('Bee Express'); setDeliveryMenuVisible(false); }} />
+                                            <List.Item title="Icare Delivery" onPress={() => { setDeliveryInfo('Icare Delivery'); setDeliveryMenuVisible(false); }} />
+                                            <List.Item title="Ninja Van" onPress={() => { setDeliveryInfo('Ninja Van'); setDeliveryMenuVisible(false); }} />
+                                            <Divider />
+                                            <List.Item title="Clear" onPress={() => { setDeliveryInfo(''); setGateName(''); setDeliveryMenuVisible(false); }} />
+                                        </Card.Content>
+                                        <Card.Actions>
+                                            <Button onPress={() => setDeliveryMenuVisible(false)}>Cancel</Button>
+                                        </Card.Actions>
+                                    </Card>
+                                </Modal>
+                            </Portal>
+
+                            {deliveryInfo === 'ကားဂိတ်ချ' && (
+                                <TextInput
+                                    label="ကားဂိတ်နာမည် (Optional)"
+                                    value={gateName}
+                                    onChangeText={setGateName}
+                                    mode="outlined"
+                                    style={styles.input}
+                                />
+                            )}
+                        </Card.Content>
+                    </Card>
+                </ScrollView>
+            </KeyboardAvoidingView>
+
+            <View style={[styles.footer, { backgroundColor: theme.colors.surface }]}>
                 <Button mode="contained" onPress={handleSave} style={styles.saveButton}>
                     Create Invoice
                 </Button>
@@ -273,15 +346,19 @@ export default function CreateInvoiceScreen({ navigation, route }) {
 
             {/* Customer Selection Modal */}
             <Portal>
-                <Modal visible={customerModalVisible} onDismiss={() => setCustomerModalVisible(false)} contentContainerStyle={styles.modalContent}>
-                    <Text variant="titleLarge" style={{ marginBottom: 10 }}>Select Customer</Text>
+                <Modal visible={customerModalVisible} onDismiss={() => setCustomerModalVisible(false)} contentContainerStyle={[styles.modalContent, { backgroundColor: theme.colors.surface, width: '98%', height: '95%', margin: 0, marginTop: 20, alignSelf: 'center' }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <Text variant="titleLarge">Select Customer</Text>
+                        <IconButton icon="close" size={24} onPress={() => setCustomerModalVisible(false)} />
+                    </View>
                     <FlatList
                         data={customers}
                         keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
                             <List.Item
                                 title={item.name}
-                                description={item.phone}
+                                description={`${item.phone || 'No phone'}${item.address ? '\n' + item.address : ''}`}
+                                descriptionNumberOfLines={3}
                                 onPress={() => {
                                     setSelectedCustomer(item);
                                     setCustomerModalVisible(false);
@@ -289,21 +366,32 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                             />
                         )}
                     />
-                    <Button onPress={() => navigation.navigate('CustomerForm')}>Add New Customer</Button>
+                    <Button onPress={() => { setCustomerModalVisible(false); navigation.navigate('CustomerForm'); }}>Add New Customer</Button>
                 </Modal>
             </Portal>
 
             {/* Product Selection Modal */}
             <Portal>
-                <Modal visible={productModalVisible} onDismiss={() => setProductModalVisible(false)} contentContainerStyle={styles.modalContent}>
-                    <Text variant="titleLarge" style={{ marginBottom: 10 }}>Select Product</Text>
+                <Modal visible={productModalVisible} onDismiss={() => setProductModalVisible(false)} contentContainerStyle={[styles.modalContent, { backgroundColor: theme.colors.surface, width: '98%', height: '95%', margin: 0, marginTop: 20, alignSelf: 'center' }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <Text variant="titleLarge">Select Product</Text>
+                        <IconButton icon="close" size={24} onPress={() => setProductModalVisible(false)} />
+                    </View>
+                    <TextInput
+                        placeholder="Search Products..."
+                        value={productSearchQuery}
+                        onChangeText={setProductSearchQuery}
+                        mode="outlined"
+                        style={{ marginBottom: 10 }}
+                        dense
+                    />
                     <FlatList
-                        data={products}
+                        data={filteredProducts}
                         keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
                             <List.Accordion
                                 title={item.name}
-                                description={`$${item.price}`}
+                                description={`${item.price} ${currency}`}
                                 onPress={() => {
                                     if (!item.variables || item.variables.length === 0) {
                                         initiateAddProduct(item);
@@ -313,7 +401,7 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                                 {item.variables && item.variables.map(v => (
                                     <List.Item
                                         key={v.id}
-                                        title={`${v.name} - $${v.salePrice || v.price}`}
+                                        title={`${v.name} - ${v.salePrice || v.price} ${currency}`}
                                         onPress={() => initiateAddProduct(item, v)}
                                     />
                                 ))}
@@ -325,7 +413,7 @@ export default function CreateInvoiceScreen({ navigation, route }) {
 
             {/* Static Options Selection Modal */}
             <Portal>
-                <Modal visible={optionsModalVisible} onDismiss={() => setOptionsModalVisible(false)} contentContainerStyle={styles.modalContent}>
+                <Modal visible={optionsModalVisible} onDismiss={() => setOptionsModalVisible(false)} contentContainerStyle={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
                     <Text variant="titleLarge" style={{ marginBottom: 10 }}>Select Options</Text>
                     <ScrollView>
                         {pendingProduct?.product.staticOptions?.map(option => (
@@ -355,7 +443,7 @@ export default function CreateInvoiceScreen({ navigation, route }) {
 
             {/* Edit Line Item Modal */}
             <Portal>
-                <Modal visible={editItemModalVisible} onDismiss={() => setEditItemModalVisible(false)} contentContainerStyle={styles.modalContent}>
+                <Modal visible={editItemModalVisible} onDismiss={() => setEditItemModalVisible(false)} contentContainerStyle={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
                     <Text variant="titleLarge" style={{ marginBottom: 10 }}>Customize Item</Text>
                     {editingItem && (
                         <View>
@@ -397,7 +485,6 @@ export default function CreateInvoiceScreen({ navigation, route }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
     },
     scrollContent: {
         padding: 10,
@@ -426,17 +513,21 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         padding: 10,
-        backgroundColor: '#fff',
         elevation: 4,
     },
     saveButton: {
         width: '100%',
     },
-    modalContent: {
-        backgroundColor: 'white',
+    modalContainer: {
         padding: 20,
         margin: 20,
+    },
+    modalContent: {
+        padding: 20,
+        margin: 10,
         borderRadius: 10,
-        maxHeight: '80%',
+        maxHeight: '90%',
+        width: '95%',
+        alignSelf: 'center',
     },
 });

@@ -43,11 +43,43 @@ export const useStore = create(
 
       // Invoices
       invoices: [],
-      addInvoice: (invoice) => set((state) => ({
-        invoices: [...state.invoices, { ...invoice, id: Date.now().toString(), date: new Date().toISOString() }]
-      })),
-      updateInvoice: (id, invoice) => set((state) => ({
-        invoices: state.invoices.map(i => i.id === id ? { ...i, ...invoice } : i)
+      addInvoice: (invoice) => set((state) => {
+        // Generate invoice number in format YYYYMMDD000001
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const datePrefix = `${year}${month}${day}`;
+
+        // Find the highest invoice number for today
+        const todayInvoices = state.invoices.filter(inv =>
+          inv.id && inv.id.startsWith(datePrefix)
+        );
+
+        let nextNumber = 1;
+        if (todayInvoices.length > 0) {
+          const maxNumber = Math.max(...todayInvoices.map(inv => {
+            const numPart = inv.id.substring(8); // Get the last 6 digits
+            return parseInt(numPart) || 0;
+          }));
+          nextNumber = maxNumber + 1;
+        }
+
+        const invoiceNumber = `${datePrefix}${String(nextNumber).padStart(6, '0')}`;
+
+        return {
+          invoices: [...state.invoices, {
+            ...invoice,
+            id: invoiceNumber,
+            date: new Date().toISOString(),
+            total: Math.round(invoice.total)
+          }]
+        };
+      }),
+      updateInvoice: (id, data) => set((state) => ({
+        invoices: state.invoices.map(inv =>
+          inv.id === id ? { ...inv, ...data, total: Math.round(data.total) } : inv
+        )
       })),
       deleteInvoice: (id) => set((state) => ({
         invoices: state.invoices.filter(i => i.id !== id)
@@ -59,10 +91,46 @@ export const useStore = create(
         address: '',
         phone: '',
         logo: null,
+        currency: 'MMK',
       },
       updateShopInfo: (info) => set((state) => ({
         shopInfo: { ...state.shopInfo, ...info }
       })),
+
+      // Categories
+      categories: [],
+      addCategory: (category) => set((state) => ({
+        categories: [...state.categories, { ...category, id: Date.now().toString() }]
+      })),
+      updateCategory: (id, data) => set((state) => ({
+        categories: state.categories.map(c => c.id === id ? { ...c, ...data } : c)
+      })),
+      deleteCategory: (id) => set((state) => ({
+        categories: state.categories.filter(c => c.id !== id)
+      })),
+
+      // Attributes
+      attributes: [], // [{ id, name, values: [] }]
+      addAttribute: (attribute) => set((state) => ({
+        attributes: [...state.attributes, { ...attribute, id: Date.now().toString() }]
+      })),
+      updateAttribute: (id, data) => set((state) => ({
+        attributes: state.attributes.map(a => a.id === id ? { ...a, ...data } : a)
+      })),
+      deleteAttribute: (id) => set((state) => ({
+        attributes: state.attributes.filter(a => a.id !== id)
+      })),
+
+      // Import Data
+      importData: (data) => set((state) => ({
+        ...state,
+        ...data,
+        shopInfo: { ...state.shopInfo, ...data.shopInfo }
+      })),
+
+      // Dark Mode
+      isDarkMode: false,
+      setDarkMode: (value) => set({ isDarkMode: value }),
     }),
     {
       name: 'invoicing-app-storage',
