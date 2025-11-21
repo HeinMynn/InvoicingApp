@@ -29,12 +29,21 @@ export default function InvoiceListScreen({ navigation }) {
 
     const years = React.useMemo(() => {
         const currentYear = new Date().getFullYear();
-        const yearList = [{ label: 'All Years', value: null }];
-        for (let i = 0; i < 5; i++) {
-            yearList.push({ label: (currentYear - i).toString(), value: currentYear - i });
+
+        // Find the oldest invoice year
+        let oldestYear = currentYear;
+        if (invoices.length > 0) {
+            oldestYear = Math.min(...invoices.map(inv => new Date(inv.date).getFullYear()));
         }
+
+        // Generate years from oldest to current
+        const yearList = [{ label: 'All Years', value: null }];
+        for (let year = currentYear; year >= oldestYear; year--) {
+            yearList.push({ label: year.toString(), value: year });
+        }
+
         return yearList;
-    }, []);
+    }, [invoices]);
 
     const filteredInvoices = React.useMemo(() => {
         return invoices.filter(inv => {
@@ -136,8 +145,9 @@ export default function InvoiceListScreen({ navigation }) {
                 ItemSeparatorComponent={() => <Divider />}
             />
             <FAB
-                style={styles.fab}
+                style={[styles.fab, { backgroundColor: theme.colors.primary }]}
                 icon="plus"
+                color={theme.colors.onPrimary}
                 onPress={() => navigation.navigate('CreateInvoice')}
             />
 

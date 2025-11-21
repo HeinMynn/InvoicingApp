@@ -140,8 +140,11 @@ export default function InvoicePreviewScreen({ route, navigation }) {
                                     const heightVal = heightEntry ? heightEntry[1]?.toString().trim() : null;
 
                                     let dimensionString = '';
-                                    if (widthVal && heightVal) {
-                                        dimensionString = `${widthVal}×${heightVal}"`;
+                                    if (widthVal || heightVal) {
+                                        // Show dimension if at least one is available
+                                        const w = widthVal || '';
+                                        const h = heightVal || '';
+                                        dimensionString = `${w}×${h}`;
                                     }
 
                                     // Get other attributes without labels, just values separated by comma

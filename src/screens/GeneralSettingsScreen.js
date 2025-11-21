@@ -210,6 +210,14 @@ export default function GeneralSettingsScreen() {
                 </List.Section>
             </View>
 
+            <Divider style={styles.divider} />
+
+            <View style={styles.section}>
+                <Button mode="outlined" onPress={useStore.getState().logout} style={{ borderColor: 'red' }} textColor="red">
+                    Logout
+                </Button>
+            </View>
+
             <View style={{ height: 50 }} />
 
             <Portal>
@@ -263,7 +271,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         marginBottom: 15,
         fontWeight: 'bold',
-        color: '#6200ee',
     },
     input: {
         marginBottom: 15,

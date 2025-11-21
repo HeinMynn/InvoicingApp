@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "Invoicing",
-    "slug": "Invoicing",
+    "name": "ShopKeeper",
+    "slug": "shopkeeper",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "scheme": "invoicingapp",
+    "scheme": "shopkeeperapp",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",

@@ -5,7 +5,6 @@ import { useStore } from '../store/useStore';
 import { useCurrency } from '../hooks/useCurrency';
 
 export default function DashboardScreen({ navigation }) {
-    const logout = useStore((state) => state.logout);
     const invoices = useStore((state) => state.invoices);
     const customers = useStore((state) => state.customers);
     const products = useStore((state) => state.products);
@@ -64,7 +63,7 @@ export default function DashboardScreen({ navigation }) {
             <Text variant="headlineMedium" style={styles.title}>Dashboard</Text>
 
             {/* Statistics Cards */}
-            <View style={styles.statsRow}>
+            <View style={styles.revenueRow}>
                 <Card style={styles.card} onPress={() => setShowThisMonth(!showThisMonth)}>
                     <Card.Content>
                         <Text variant="titleMedium">
@@ -105,7 +104,7 @@ export default function DashboardScreen({ navigation }) {
                                 <View
                                     style={[
                                         styles.bar,
-                                        { height: Math.max((day.revenue / chartData.maxRevenue) * 120, 2) }
+                                        { height: Math.max((day.revenue / chartData.maxRevenue) * 120, 2), backgroundColor: theme.colors.primary }
                                     ]}
                                 />
                                 <Text style={styles.barLabel}>{day.day}</Text>
@@ -130,7 +129,7 @@ export default function DashboardScreen({ navigation }) {
                                 </View>
                                 <View style={{ alignItems: 'flex-end' }}>
                                     <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>{currency}</Text>
-                                    <Text variant="titleMedium" style={{ color: '#6200ee' }} numberOfLines={1} adjustsFontSizeToFit>{Math.round(invoice.total)}</Text>
+                                    <Text variant="titleMedium" style={{ color: theme.colors.primary }} numberOfLines={1} adjustsFontSizeToFit>{Math.round(invoice.total)}</Text>
                                 </View>
                             </View>
                         ))
@@ -145,9 +144,6 @@ export default function DashboardScreen({ navigation }) {
                 </Button>
                 <Button mode="outlined" onPress={() => navigation.navigate('Reports')} style={styles.button} icon="chart-bar">
                     View Full Reports
-                </Button>
-                <Button mode="outlined" onPress={logout} style={styles.logoutButton}>
-                    Logout
                 </Button>
             </View>
         </ScrollView>
@@ -168,6 +164,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginBottom: 10,
     },
+    revenueRow: {
+        paddingHorizontal: 20,
+        marginBottom: 10,
+    },
     statCard: {
         flex: 1,
         marginHorizontal: 5,
@@ -178,7 +178,6 @@ const styles = StyleSheet.create({
     },
     statValue: {
         fontWeight: 'bold',
-        color: '#6200ee',
     },
     chartCard: {
         margin: 20,
@@ -197,7 +196,6 @@ const styles = StyleSheet.create({
     },
     bar: {
         width: 30,
-        backgroundColor: '#6200ee',
         borderRadius: 4,
         marginBottom: 5,
     },
@@ -233,4 +231,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
         borderColor: 'red',
     },
+    revenue: {
+        fontWeight: 'bold',
+    }
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
-import { List, FAB, Text, useTheme, Divider } from 'react-native-paper';
+import { List, FAB, Text, useTheme, Divider, Button } from 'react-native-paper';
 import { useStore } from '../../store/useStore';
 import { useCurrency } from '../../hooks/useCurrency';
 
@@ -22,12 +22,33 @@ export default function ProductListScreen({ navigation }) {
                         onPress={() => navigation.navigate('ProductForm', { product: item })}
                     />
                 )}
+                ListHeaderComponent={
+                    <View style={styles.header}>
+                        <Button
+                            mode="outlined"
+                            onPress={() => navigation.navigate('CategoryList')}
+                            style={styles.headerButton}
+                            compact
+                        >
+                            Categories
+                        </Button>
+                        <Button
+                            mode="outlined"
+                            onPress={() => navigation.navigate('AttributeList')}
+                            style={styles.headerButton}
+                            compact
+                        >
+                            Attributes
+                        </Button>
+                    </View>
+                }
                 ListEmptyComponent={<Text style={styles.empty}>No products found</Text>}
                 ItemSeparatorComponent={() => <Divider />}
             />
             <FAB
-                style={styles.fab}
+                style={[styles.fab, { backgroundColor: theme.colors.primary }]}
                 icon="plus"
+                color={theme.colors.onPrimary}
                 onPress={() => navigation.navigate('ProductForm')}
             />
         </View>
@@ -48,5 +69,14 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 20,
         color: '#666',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        padding: 10,
+    },
+    headerButton: {
+        flex: 1,
+        marginHorizontal: 5,
     },
 });

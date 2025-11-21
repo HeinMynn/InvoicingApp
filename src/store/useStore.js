@@ -20,7 +20,7 @@ export const useStore = create(
       // Customers
       customers: [],
       addCustomer: (customer) => set((state) => ({
-        customers: [...state.customers, { ...customer, id: Date.now().toString() }]
+        customers: [...state.customers, { ...customer, id: customer.id || Date.now().toString() }]
       })),
       updateCustomer: (id, data) => set((state) => ({
         customers: state.customers.map(c => c.id === id ? { ...c, ...data } : c)
@@ -45,7 +45,7 @@ export const useStore = create(
       invoices: [],
       addInvoice: (invoice) => set((state) => {
         // Generate invoice number in format YYYYMMDD000001
-        const now = new Date();
+        const now = invoice.date ? new Date(invoice.date) : new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
@@ -71,7 +71,7 @@ export const useStore = create(
           invoices: [...state.invoices, {
             ...invoice,
             id: invoiceNumber,
-            date: new Date().toISOString(),
+            date: invoice.date || new Date().toISOString(),
             total: Math.round(invoice.total)
           }]
         };

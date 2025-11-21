@@ -10,7 +10,8 @@ const lightTheme = {
   ...MD3LightTheme,
   colors: {
     ...MD3LightTheme.colors,
-    primary: '#6200ee',
+    primary: '#A52A2E',
+    onPrimary: '#FFFFFF', // White text on burgundy
     secondary: '#03dac6',
   },
 };
@@ -19,7 +20,8 @@ const darkTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: '#bb86fc',
+    primary: '#ac9423',
+    onPrimary: '#000000', // Black text on gold/yellow
     secondary: '#03dac6',
   },
 };

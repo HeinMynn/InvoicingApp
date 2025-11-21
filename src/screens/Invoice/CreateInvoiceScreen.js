@@ -116,6 +116,17 @@ export default function CreateInvoiceScreen({ navigation, route }) {
             name += ` [${optionString}]`;
         }
 
+        // Collect static attributes (non-variation attributes from product)
+        const staticAttributes = {};
+        if (product.selectedAttributes) {
+            product.selectedAttributes.forEach(attr => {
+                if (!attr.useAsVariation && attr.selectedValues && attr.selectedValues.length > 0) {
+                    // For non-variation attributes, use the first selected value
+                    staticAttributes[attr.name] = attr.selectedValues[0];
+                }
+            });
+        }
+
         // Check if the same product+variable+options already exists
         const existingItemIndex = selectedProducts.findIndex(item =>
             item.productId === product.id &&
@@ -143,7 +154,7 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                 discount: '0',
                 extraCharges: '0',
                 note: '',
-                selectedOptions: options, // Store for reference if needed
+                selectedOptions: { ...options, ...staticAttributes }, // Merge manual options with static attributes
                 variableAttributes: variable?.attributes, // Store attributes for formatting (e.g. Width, Height)
                 productName: product.name // Store original product name to avoid parsing issues in preview
             }]);

@@ -4,7 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useStore } from '../store/useStore';
 import Icon from 'react-native-paper/src/components/Icon';
-import { IconButton } from 'react-native-paper';
+import { IconButton, useTheme } from 'react-native-paper';
 
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -13,11 +13,16 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
+    const theme = useTheme();
     return (
         <Tab.Navigator
             screenOptions={{
-                tabBarActiveTintColor: '#6200ee',
-                tabBarInactiveTintColor: 'gray',
+                tabBarActiveTintColor: theme.colors.primary,
+                tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
+                tabBarStyle: {
+                    backgroundColor: theme.colors.elevation.level2,
+                    borderTopColor: theme.colors.outline,
+                },
                 headerShown: false,
             }}
         >
@@ -77,10 +82,22 @@ const linking = {
 
 export default function AppNavigator() {
     const user = useStore((state) => state.user);
+    const theme = useTheme();
 
     return (
-        <NavigationContainer linking={linking}>
-            <Stack.Navigator screenOptions={{ headerShown: true }}>
+        <NavigationContainer linking={linking} theme={theme}>
+            <Stack.Navigator
+                screenOptions={{
+                    headerShown: true,
+                    headerStyle: {
+                        backgroundColor: theme.colors.surface,
+                    },
+                    headerTintColor: theme.colors.onSurface,
+                    headerBackTitleStyle: {
+                        fontSize: 12,
+                    },
+                }}
+            >
                 {!user ? (
                     <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
                 ) : (
@@ -90,17 +107,17 @@ export default function AppNavigator() {
                             component={MainTabs}
                             options={({ navigation }) => ({
                                 headerShown: true,
-                                title: 'Invoicing App',
+                                title: 'ShopKeeper',
                                 headerRight: () => (
                                     <>
                                         <IconButton
                                             icon="cog"
-                                            iconColor="#6200ee"
+                                            iconColor={theme.colors.primary}
                                             onPress={() => navigation.navigate('GeneralSettings')}
                                         />
                                         <IconButton
                                             icon="store"
-                                            iconColor="#6200ee"
+                                            iconColor={theme.colors.primary}
                                             onPress={() => navigation.navigate('ShopSettings')}
                                         />
                                     </>

@@ -94,15 +94,7 @@ export default function ShopSettingsScreen({ navigation }) {
 
             <Divider style={styles.divider} />
 
-            <View style={styles.section}>
-                <Text variant="titleMedium" style={styles.sectionTitle}>Advanced</Text>
-                <Button mode="outlined" onPress={() => navigation.navigate('CategoryList')} style={styles.button}>
-                    Manage Categories
-                </Button>
-                <Button mode="outlined" onPress={() => navigation.navigate('AttributeList')} style={styles.button}>
-                    Manage Attributes
-                </Button>
-            </View>
+            <View style={{ height: 50 }} />
 
             <View style={{ height: 50 }} />
         </ScrollView>
@@ -120,7 +112,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         marginBottom: 15,
         fontWeight: 'bold',
-        color: '#6200ee',
     },
     logoContainer: {
         alignItems: 'center',

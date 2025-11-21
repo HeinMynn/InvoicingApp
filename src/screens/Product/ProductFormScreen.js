@@ -52,6 +52,7 @@ export default function ProductFormScreen({ navigation, route }) {
     const [selectedAttributes, setSelectedAttributes] = useState(product?.selectedAttributes || []);
     const [attributeDialogVisible, setAttributeDialogVisible] = useState(false);
     const [newAttributeName, setNewAttributeName] = useState(''); // For creating new global attribute inline
+    const [attributeValueInputs, setAttributeValueInputs] = useState({}); // { attributeId: 'value' }
 
     // Variables: [{ id, attributes: { Color: 'Red', Size: 'L' }, price, salePrice }]
     const [variables, setVariables] = useState(product?.variables || []);
@@ -63,6 +64,7 @@ export default function ProductFormScreen({ navigation, route }) {
     // const [optionDialogVisible, setOptionDialogVisible] = useState(false);
     // const [newOptionValue, setNewOptionValue] = useState({}); // { optionId: 'value' }
 
+
     const handleAddAttributeToProduct = (globalAttr) => {
         if (!selectedAttributes.find(a => a.id === globalAttr.id)) {
             setSelectedAttributes([...selectedAttributes, { ...globalAttr, useAsVariation: true, selectedValues: [] }]);
@@ -73,11 +75,47 @@ export default function ProductFormScreen({ navigation, route }) {
     const handleCreateNewAttribute = () => {
         if (newAttributeName.trim()) {
             const newAttr = { name: newAttributeName.trim(), values: [] };
-            addAttribute(newAttr); // Add to global store (we don't get ID back immediately in this simple store, assuming sync)
-            // In a real app we'd wait for ID. Here we might need to refresh or rely on store update.
-            // For simplicity, let's just close dialog and let user pick it from list (it will appear).
+            addAttribute(newAttr);
+
+            // Auto-add to product after creation
+            setTimeout(() => {
+                const createdAttr = globalAttributes.find(attr => attr.name === newAttr.name);
+                if (createdAttr && !selectedAttributes.find(a => a.id === createdAttr.id)) {
+                    setSelectedAttributes([...selectedAttributes, { ...createdAttr, useAsVariation: true, selectedValues: [] }]);
+                }
+            }, 100);
+
             setNewAttributeName('');
-            // Ideally we'd auto-select it, but let's keep it simple.
+            setAttributeDialogVisible(false);
+        }
+    };
+
+    const handleAddValueToAttribute = (attrId) => {
+        const valueToAdd = attributeValueInputs[attrId];
+        if (valueToAdd && valueToAdd.trim()) {
+            const attr = selectedAttributes.find(a => a.id === attrId);
+            if (attr) {
+                // Check for duplicates
+                if (attr.values && attr.values.includes(valueToAdd.trim())) {
+                    // Value already exists, don't add it
+                    setAttributeValueInputs({ ...attributeValueInputs, [attrId]: '' });
+                    return;
+                }
+
+                const updatedValues = [...(attr.values || []), valueToAdd.trim()];
+
+                // Update in global store with correct signature (id, data)
+                const updateAttribute = useStore.getState().updateAttribute;
+                updateAttribute(attr.id, { values: updatedValues });
+
+                // Update in selected attributes
+                setSelectedAttributes(selectedAttributes.map(a =>
+                    a.id === attrId ? { ...a, values: updatedValues } : a
+                ));
+
+                // Clear input
+                setAttributeValueInputs({ ...attributeValueInputs, [attrId]: '' });
+            }
         }
     };
 
@@ -357,6 +395,20 @@ export default function ProductFormScreen({ navigation, route }) {
                                     ))}
                                 </View>
                                 {attr.values.length === 0 && <Text style={{ color: '#888', fontStyle: 'italic' }}>No values defined for this attribute.</Text>}
+
+                                {/* Add Value Input */}
+                                <View style={{ flexDirection: 'row', marginTop: 10 }}>
+                                    <TextInput
+                                        label="Add New Value"
+                                        value={attributeValueInputs[attr.id] || ''}
+                                        onChangeText={(text) => setAttributeValueInputs({ ...attributeValueInputs, [attr.id]: text })}
+                                        style={{ flex: 1, marginRight: 5 }}
+                                        mode="outlined"
+                                        dense
+                                        onSubmitEditing={() => handleAddValueToAttribute(attr.id)}
+                                    />
+                                    <Button mode="contained" onPress={() => handleAddValueToAttribute(attr.id)} compact>Add</Button>
+                                </View>
                             </View>
                         </Card.Content>
                     </Card >

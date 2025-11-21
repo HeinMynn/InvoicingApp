@@ -43,8 +43,9 @@ export default function AttributeListScreen({ navigation }) {
                 />
             )}
             <FAB
-                style={styles.fab}
+                style={[styles.fab, { backgroundColor: theme.colors.primary }]}
                 icon="plus"
+                color={theme.colors.onPrimary}
                 onPress={() => navigation.navigate('AttributeForm')}
             />
         </View>
@@ -74,6 +75,5 @@ const styles = StyleSheet.create({
     chip: {
         marginRight: 4,
         marginBottom: 4,
-        height: 24,
     },
 });
