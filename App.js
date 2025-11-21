@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useStore } from './src/store/useStore';
 import { Linking, Alert } from 'react-native';
+import { checkForUpdates, shouldCheckForUpdate, saveUpdateCheckTimestamp, skipVersion, DEFAULT_UPDATE_URL } from './src/utils/updateChecker';
 
 const lightTheme = {
   ...MD3LightTheme,
@@ -29,7 +30,60 @@ const darkTheme = {
 function AppContent() {
   const isDarkMode = useStore((state) => state.isDarkMode);
   const importData = useStore((state) => state.importData);
+  const shopInfo = useStore((state) => state.shopInfo);
   const theme = isDarkMode ? darkTheme : lightTheme;
+
+  // Check for app updates
+  const checkForAppUpdates = async () => {
+    try {
+      const updateUrl = shopInfo.updateCheckUrl || DEFAULT_UPDATE_URL;
+
+      const shouldCheck = await shouldCheckForUpdate();
+      if (!shouldCheck) return; // Too soon since last check
+
+      const updateInfo = await checkForUpdates(updateUrl);
+      await saveUpdateCheckTimestamp();
+
+      if (updateInfo) {
+        showUpdateDialog(updateInfo);
+      }
+    } catch (error) {
+      console.error('Update check failed:', error);
+      // Silently fail - don't bother user with update check errors
+    }
+  };
+
+  // Show update dialog
+  const showUpdateDialog = (updateInfo) => {
+    const buttons = updateInfo.forceUpdate
+      ? [
+        {
+          text: 'Update Now',
+          onPress: () => Linking.openURL(updateInfo.downloadUrl),
+        },
+      ]
+      : [
+        {
+          text: 'Later',
+          style: 'cancel',
+        },
+        {
+          text: 'Skip This Version',
+          onPress: () => skipVersion(updateInfo.newVersion),
+        },
+        {
+          text: 'Update Now',
+          onPress: () => Linking.openURL(updateInfo.downloadUrl),
+        },
+      ];
+
+    Alert.alert(
+      'Update Available',
+      `Version ${updateInfo.newVersion} is now available!\n\n${updateInfo.releaseNotes}\n\nCurrent version: ${updateInfo.currentVersion}`,
+      buttons,
+      { cancelable: !updateInfo.forceUpdate }
+    );
+  };
 
   useEffect(() => {
     const handleUrl = (url) => {
@@ -96,6 +150,11 @@ function AppContent() {
       subscription.remove();
     };
   }, [importData]);
+
+  // Check for updates on app launch
+  useEffect(() => {
+    checkForAppUpdates();
+  }, []);
 
   return (
     <PaperProvider theme={theme}>

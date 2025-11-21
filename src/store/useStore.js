@@ -92,6 +92,8 @@ export const useStore = create(
         phone: '',
         logo: null,
         currency: 'MMK',
+        deliveryOptions: ['Royal Express', 'ကားဂိတ်ချ', 'Bee Express', 'Icare Delivery', 'Ninja Van'],
+        updateCheckUrl: 'https://gist.githubusercontent.com/HeinMynn/199fa70bb75f48a7b9d03b5ccc09d585/raw',
       },
       updateShopInfo: (info) => set((state) => ({
         shopInfo: { ...state.shopInfo, ...info }

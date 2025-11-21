@@ -179,7 +179,7 @@ export default function InvoicePreviewScreen({ route, navigation }) {
                                             {(parseFloat(item.extraCharges) > 0 || parseFloat(item.discount) > 0) && (
                                                 <Text style={styles.itemNote}>
                                                     {parseFloat(item.extraCharges) > 0 ? `+Extras: ${formatPrice(item.extraCharges)} ` : ''}
-                                                    {parseFloat(item.discount) > 0 ? `-Disc: ${formatPrice(item.discount)}` : ''}
+                                                    {parseFloat(item.discount) > 0 ? `-Discount: ${formatPrice(item.discount)}` : ''}
                                                 </Text>
                                             )}
                                         </View>
@@ -222,6 +222,20 @@ export default function InvoicePreviewScreen({ route, navigation }) {
                                 </View>
                             </View>
 
+                            {/* Discount Row */}
+                            {parseFloat(invoice.discount || 0) > 0 && (
+                                <View style={styles.tableDataRow}>
+                                    <View style={[styles.tableCell, styles.tableCellName]} />
+                                    <View style={[styles.tableCell, styles.tableCellQty]} />
+                                    <View style={[styles.tableCell, styles.tableCellPrice]}>
+                                        <Text style={[styles.tableCellText, styles.boldText]}>Discount:</Text>
+                                    </View>
+                                    <View style={[styles.tableCell, styles.tableCellTotal]}>
+                                        <Text style={[styles.tableCellText, styles.alignRight, styles.boldText]}>{formatPrice(invoice.discount || 0)}</Text>
+                                    </View>
+                                </View>
+                            )}
+
                             {/* Grand Total Row */}
                             <View style={styles.tableDataRow}>
                                 <View style={[styles.tableCell, styles.tableCellName]} />
@@ -230,7 +244,7 @@ export default function InvoicePreviewScreen({ route, navigation }) {
                                     <Text style={[styles.tableCellText, styles.boldText]}>Grand Total:</Text>
                                 </View>
                                 <View style={[styles.tableCell, styles.tableCellTotal]}>
-                                    <Text style={[styles.tableCellText, styles.alignRight, styles.boldText]}>{formatPrice(invoice.total - (invoice.deposit || 0))}</Text>
+                                    <Text style={[styles.tableCellText, styles.alignRight, styles.boldText]}>{formatPrice(invoice.total - (invoice.deposit || 0) - (invoice.discount || 0))}</Text>
                                 </View>
                             </View>
                         </View>
@@ -245,7 +259,12 @@ export default function InvoicePreviewScreen({ route, navigation }) {
                         {(invoice.note || invoice.deliveryInfo) && (
                             <View style={styles.notesSection}>
                                 {invoice.note ? <Text style={styles.noteText}>Note: {invoice.note}</Text> : null}
-                                {invoice.deliveryInfo ? <Text style={styles.noteText}>Delivery: {invoice.deliveryInfo}</Text> : null}
+                                {invoice.deliveryInfo ? (
+                                    <Text style={styles.noteText}>
+                                        Delivery: {invoice.deliveryInfo}
+                                        {invoice.gateName ? ` (${invoice.gateName})` : ''}
+                                    </Text>
+                                ) : null}
                             </View>
                         )}
                     </ViewShot>

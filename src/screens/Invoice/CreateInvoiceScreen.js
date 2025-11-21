@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { View, ScrollView, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Keyboard, TouchableOpacity } from 'react-native';
 import { TextInput, Button, Text, Card, IconButton, Menu, Divider, Portal, Modal, List, HelperText, useTheme } from 'react-native-paper';
 import { useStore } from '../../store/useStore';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -10,6 +10,7 @@ export default function CreateInvoiceScreen({ navigation, route }) {
     const addInvoice = useStore((state) => state.addInvoice);
     const updateInvoice = useStore((state) => state.updateInvoice);
     const addCustomer = useStore((state) => state.addCustomer); // Add this
+    const shopInfo = useStore((state) => state.shopInfo);
     const theme = useTheme();
     const currency = useCurrency();
 
@@ -21,6 +22,7 @@ export default function CreateInvoiceScreen({ navigation, route }) {
     const [deliveryInfo, setDeliveryInfo] = useState('');
     const [gateName, setGateName] = useState('');
     const [deposit, setDeposit] = useState('0');
+    const [discount, setDiscount] = useState('0');
     const [deliveryMenuVisible, setDeliveryMenuVisible] = useState(false);
 
     useEffect(() => {
@@ -31,7 +33,8 @@ export default function CreateInvoiceScreen({ navigation, route }) {
             setNote(editingInvoice.note || '');
             setDeliveryInfo(editingInvoice.deliveryInfo || '');
             setGateName(editingInvoice.gateName || '');
-            setDeposit(editingInvoice.deposit || '0');
+            setDeposit(editingInvoice.deposit ? String(editingInvoice.deposit) : '0');
+            setDiscount(editingInvoice.discount ? String(editingInvoice.discount) : '0');
         }
     }, [editingInvoice]);
 
@@ -255,7 +258,8 @@ export default function CreateInvoiceScreen({ navigation, route }) {
             note,
             deliveryInfo,
             gateName: deliveryInfo === 'ကားဂိတ်ချ' ? gateName : '',
-            deposit: parseFloat(deposit || 0)
+            deposit: parseFloat(deposit || 0),
+            discount: parseFloat(discount || 0)
         };
 
         if (editingInvoice) {
@@ -360,6 +364,14 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                                 style={styles.input}
                             />
                             <TextInput
+                                label="Discount Amount"
+                                value={discount}
+                                onChangeText={setDiscount}
+                                keyboardType="numeric"
+                                mode="outlined"
+                                style={styles.input}
+                            />
+                            <TextInput
                                 label="Note (Optional)"
                                 value={note}
                                 onChangeText={setNote}
@@ -367,18 +379,37 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                                 style={styles.input}
                             />
 
-                            <TextInput
-                                label="Delivery Service (Optional)"
-                                value={deliveryInfo}
-                                mode="outlined"
-                                editable={false}
-                                right={<TextInput.Icon icon="menu-down" />}
-                                onPressIn={() => {
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => {
                                     Keyboard.dismiss();
                                     setDeliveryMenuVisible(true);
                                 }}
-                                style={styles.input}
-                            />
+                                style={[styles.input, {
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.outline,
+                                    borderRadius: 4,
+                                    padding: 16,
+                                    backgroundColor: theme.colors.surface,
+                                    justifyContent: 'center',
+                                    minHeight: 56,
+                                }]}
+                            >
+                                <Text variant="bodySmall" style={{ color: deliveryInfo ? theme.colors.onSurface : theme.colors.onSurfaceVariant, marginBottom: deliveryInfo ? 4 : 0 }}>
+                                    Delivery Service (Optional)
+                                </Text>
+                                {deliveryInfo && (
+                                    <Text variant="bodyLarge" style={{ color: theme.colors.onSurface }}>
+                                        {deliveryInfo}
+                                    </Text>
+                                )}
+                                <IconButton
+                                    icon="menu-down"
+                                    size={24}
+                                    style={{ position: 'absolute', right: 0, top: 4 }}
+                                    iconColor={theme.colors.onSurfaceVariant}
+                                />
+                            </TouchableOpacity>
 
                             <Portal>
                                 <Modal
@@ -389,11 +420,16 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                                     <Card>
                                         <Card.Title title="Select Delivery Service" />
                                         <Card.Content>
-                                            <List.Item title="Royal Express" onPress={() => { setDeliveryInfo('Royal Express'); setDeliveryMenuVisible(false); }} />
-                                            <List.Item title="ကားဂိတ်ချ" onPress={() => { setDeliveryInfo('ကားဂိတ်ချ'); setDeliveryMenuVisible(false); }} />
-                                            <List.Item title="Bee Express" onPress={() => { setDeliveryInfo('Bee Express'); setDeliveryMenuVisible(false); }} />
-                                            <List.Item title="Icare Delivery" onPress={() => { setDeliveryInfo('Icare Delivery'); setDeliveryMenuVisible(false); }} />
-                                            <List.Item title="Ninja Van" onPress={() => { setDeliveryInfo('Ninja Van'); setDeliveryMenuVisible(false); }} />
+                                            {(shopInfo.deliveryOptions || []).map((option, index) => (
+                                                <List.Item
+                                                    key={index}
+                                                    title={option}
+                                                    onPress={() => {
+                                                        setDeliveryInfo(option);
+                                                        setDeliveryMenuVisible(false);
+                                                    }}
+                                                />
+                                            ))}
                                             <Divider />
                                             <List.Item title="Clear" onPress={() => { setDeliveryInfo(''); setGateName(''); setDeliveryMenuVisible(false); }} />
                                         </Card.Content>

@@ -15,6 +15,7 @@ export default function ShopSettingsScreen({ navigation }) {
     const [address, setAddress] = useState(shopInfo.address || '');
     const [phone, setPhone] = useState(shopInfo.phone || '');
     const [logo, setLogo] = useState(shopInfo.logo || null);
+    const [newDeliveryOption, setNewDeliveryOption] = useState('');
 
     const pickImage = async () => {
         let result = await ImagePicker.launchImageLibraryAsync({
@@ -32,6 +33,18 @@ export default function ShopSettingsScreen({ navigation }) {
     const handleSave = () => {
         updateShopInfo({ name, nameBurmese, tagline, address, phone, logo });
         Alert.alert('Success', 'Shop information saved successfully');
+    };
+
+    const handleAddDeliveryOption = () => {
+        if (newDeliveryOption.trim()) {
+            const currentOptions = shopInfo.deliveryOptions || [];
+            if (!currentOptions.includes(newDeliveryOption.trim())) {
+                updateShopInfo({ deliveryOptions: [...currentOptions, newDeliveryOption.trim()] });
+                setNewDeliveryOption('');
+            } else {
+                Alert.alert('Duplicate', 'This delivery option already exists');
+            }
+        }
     };
 
     return (
@@ -94,7 +107,49 @@ export default function ShopSettingsScreen({ navigation }) {
 
             <Divider style={styles.divider} />
 
-            <View style={{ height: 50 }} />
+            <View style={styles.section}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>Delivery Options</Text>
+                <Text variant="bodySmall" style={{ marginBottom: 15, color: theme.colors.onSurfaceVariant }}>
+                    Manage delivery service options that appear in invoice creation
+                </Text>
+
+                {(shopInfo.deliveryOptions || []).map((option, index) => (
+                    <View key={index} style={[styles.deliveryOptionItem, { backgroundColor: theme.colors.surfaceVariant }]}>
+                        <Text style={{ flex: 1, color: theme.colors.onSurface }}>{option}</Text>
+                        <Button
+                            mode="text"
+                            textColor="red"
+                            onPress={() => {
+                                const newOptions = shopInfo.deliveryOptions.filter((_, i) => i !== index);
+                                updateShopInfo({ deliveryOptions: newOptions });
+                            }}
+                            compact
+                        >
+                            Delete
+                        </Button>
+                    </View>
+                ))}
+
+                <View style={styles.addDeliveryOption}>
+                    <TextInput
+                        label="New Delivery Option"
+                        value={newDeliveryOption}
+                        onChangeText={setNewDeliveryOption}
+                        mode="outlined"
+                        style={{ flex: 1, marginRight: 10 }}
+                        dense
+                        onSubmitEditing={handleAddDeliveryOption}
+                    />
+                    <Button
+                        mode="contained"
+                        onPress={handleAddDeliveryOption}
+                        disabled={!newDeliveryOption.trim()}
+                        compact
+                    >
+                        Add
+                    </Button>
+                </View>
+            </View>
 
             <View style={{ height: 50 }} />
         </ScrollView>
@@ -145,5 +200,18 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: '#eee',
         marginVertical: 20,
+    },
+    deliveryOptionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        marginBottom: 8,
+    },
+    addDeliveryOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 10,
     },
 });

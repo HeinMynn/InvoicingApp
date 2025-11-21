@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Share } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Share, Linking } from 'react-native';
 import { TextInput, Button, Text, Switch, List, Divider, IconButton, useTheme, Portal, Dialog, RadioButton } from 'react-native-paper';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Application from 'expo-application';
 import { useStore } from '../store/useStore';
+import { checkForUpdates, saveUpdateCheckTimestamp, getLastUpdateCheck, DEFAULT_UPDATE_URL } from '../utils/updateChecker';
 
 export default function GeneralSettingsScreen() {
     const shopInfo = useStore((state) => state.shopInfo);
@@ -22,6 +24,9 @@ export default function GeneralSettingsScreen() {
     const [urlDialogVisible, setUrlDialogVisible] = useState(false);
     const [importUrl, setImportUrl] = useState('');
     const [importType, setImportType] = useState('products');
+    const [updateCheckUrl, setUpdateCheckUrl] = useState(shopInfo.updateCheckUrl || '');
+    const [checkingUpdate, setCheckingUpdate] = useState(false);
+    const [lastUpdateCheck, setLastUpdateCheck] = useState(null);
 
     const handleSaveCurrency = () => {
         updateShopInfo({ currency, currencySymbol });
@@ -30,6 +35,42 @@ export default function GeneralSettingsScreen() {
 
     const handleDarkModeToggle = (value) => {
         setDarkMode(value);
+    };
+
+    const handleSaveUpdateUrl = () => {
+        updateShopInfo({ updateCheckUrl });
+        Alert.alert('Success', 'Update check URL saved successfully');
+    };
+
+    const handleCheckForUpdates = async () => {
+        const checkUrl = updateCheckUrl || DEFAULT_UPDATE_URL;
+
+        setCheckingUpdate(true);
+        try {
+            const updateInfo = await checkForUpdates(checkUrl);
+            await saveUpdateCheckTimestamp();
+
+            const lastCheck = await getLastUpdateCheck();
+            setLastUpdateCheck(lastCheck);
+
+            if (updateInfo) {
+                Alert.alert(
+                    'Update Available',
+                    `Version ${updateInfo.newVersion} is now available!\n\n${updateInfo.releaseNotes}\n\nCurrent version: ${updateInfo.currentVersion}`,
+                    [
+                        { text: 'Later', style: 'cancel' },
+                        { text: 'Download', onPress: () => Linking.openURL(updateInfo.downloadUrl) }
+                    ]
+                );
+            } else {
+                Alert.alert('No Updates', 'You are using the latest version');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to check for updates. Please check your update URL.');
+            console.error('Update check error:', error);
+        } finally {
+            setCheckingUpdate(false);
+        }
     };
 
     const handleUrlImport = async () => {
@@ -208,6 +249,43 @@ export default function GeneralSettingsScreen() {
                         right={() => <IconButton icon="cloud-download" onPress={() => setUrlDialogVisible(true)} />}
                     />
                 </List.Section>
+            </View>
+
+            <Divider style={styles.divider} />
+
+            <View style={styles.section}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>App Updates</Text>
+                <Text variant="bodySmall" style={{ marginBottom: 15, color: theme.colors.onSurfaceVariant }}>
+                    Current Version: {Application.nativeApplicationVersion || '1.0.0'}
+                </Text>
+
+                <TextInput
+                    label="Update Check URL"
+                    value={updateCheckUrl}
+                    onChangeText={setUpdateCheckUrl}
+                    mode="outlined"
+                    style={styles.input}
+                    placeholder={DEFAULT_UPDATE_URL}
+                />
+                <Button mode="contained" onPress={handleSaveUpdateUrl} style={styles.button}>
+                    Save Update URL
+                </Button>
+
+                <Button
+                    mode="outlined"
+                    onPress={handleCheckForUpdates}
+                    style={styles.button}
+                    loading={checkingUpdate}
+                    disabled={checkingUpdate}
+                >
+                    Check for Updates
+                </Button>
+
+                {lastUpdateCheck && (
+                    <Text variant="bodySmall" style={{ marginTop: 10, color: theme.colors.onSurfaceVariant }}>
+                        Last checked: {lastUpdateCheck.toLocaleString()}
+                    </Text>
+                )}
             </View>
 
             <Divider style={styles.divider} />
