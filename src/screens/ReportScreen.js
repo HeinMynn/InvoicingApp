@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, Keyboard, Dimensions, Platform } from 'react-native';
 import { Text, Card, SegmentedButtons, DataTable, Button, Divider, useTheme, TextInput, Portal, Modal, List, IconButton, Chip } from 'react-native-paper';
 import { useStore } from '../store/useStore';
@@ -16,6 +16,18 @@ export default function ReportScreen() {
     const theme = useTheme();
     const currency = useCurrency();
     const [view, setView] = useState('overview'); // 'overview' | 'items' | 'customers' | 'trends'
+
+    // Category Filter State
+    const [selectedCategories, setSelectedCategories] = useState([]);
+
+    // Initialize selected categories
+    useEffect(() => {
+        const allCategoryIds = categories.map(c => c.id);
+        allCategoryIds.push('uncategorized'); // Add special ID for uncategorized
+        setSelectedCategories(allCategoryIds);
+    }, [categories]);
+
+
 
     // Date Filtering
     const [dateRange, setDateRange] = useState('thisMonth'); // 'today', 'yesterday', 'last7', 'last30', 'thisMonth', 'lastMonth', 'custom'
@@ -123,6 +135,37 @@ export default function ReportScreen() {
         })).sort((a, b) => b.key.localeCompare(a.key));
     }, [filteredInvoices]);
 
+    // Active Categories (with data in selected range)
+    const activeCategoryIds = useMemo(() => {
+        const ids = new Set();
+        filteredInvoices.forEach(inv => {
+            inv.items.forEach(item => {
+                const product = products.find(p => p.id === item.productId);
+                const catId = product ? product.categoryId : 'uncategorized';
+                ids.add(catId || 'uncategorized');
+            });
+        });
+        return ids;
+    }, [filteredInvoices, products]);
+
+    const toggleCategory = (catId) => {
+        setSelectedCategories(prev => {
+            if (prev.includes(catId)) {
+                // Check how many ACTIVE categories are currently selected
+                const activeAndSelectedCount = prev.filter(id => activeCategoryIds.has(id)).length;
+
+                // If this is the last active category being deselected, prevent it
+                if (activeAndSelectedCount <= 1 && activeCategoryIds.has(catId)) {
+                    return prev;
+                }
+
+                return prev.filter(id => id !== catId);
+            } else {
+                return [...prev, catId];
+            }
+        });
+    };
+
     // Chart Data (Category Sales Trend)
     const chartData = useMemo(() => {
         if (filteredInvoices.length === 0) return null;
@@ -160,8 +203,12 @@ export default function ReportScreen() {
             inv.items.forEach(item => {
                 // Find product to get category
                 const product = products.find(p => p.id === item.productId);
-                const catId = product ? product.categoryId : null;
-                const catName = getCategoryName(catId);
+                const catId = product ? product.categoryId : 'uncategorized';
+
+                // Skip if category is not selected
+                if (!selectedCategories.includes(catId || 'uncategorized')) return;
+
+                const catName = getCategoryName(catId === 'uncategorized' ? null : catId);
 
                 if (!categoryMap[catName]) {
                     categoryMap[catName] = { name: catName, dataMap: {} };
@@ -209,7 +256,7 @@ export default function ReportScreen() {
             datasets,
             legend: datasets.map(ds => ds.legend) // Explicit legend array for some chart configs
         };
-    }, [filteredInvoices, products, categories, chartMetric]);
+    }, [filteredInvoices, products, categories, chartMetric, selectedCategories]);
 
     // Item Data
     const itemData = useMemo(() => {
@@ -302,7 +349,7 @@ export default function ReportScreen() {
                         key={range}
                         selected={dateRange === range}
                         onPress={() => setDateRange(range)}
-                        style={styles.chip}
+                        style={[styles.chip, { height: 36, justifyContent: 'center' }]}
                         showSelectedOverlay
                     >
                         {range === 'today' ? 'Today' :
@@ -395,6 +442,31 @@ export default function ReportScreen() {
                                 density="small"
                             />
                         </View>
+
+                        {/* Category Filter Chips */}
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                            {activeCategoryIds.has('uncategorized') && (
+                                <Chip
+                                    selected={selectedCategories.includes('uncategorized')}
+                                    onPress={() => toggleCategory('uncategorized')}
+                                    style={{ marginRight: 5, height: 36, justifyContent: 'center' }}
+                                    showSelectedOverlay
+                                >
+                                    Uncategorized
+                                </Chip>
+                            )}
+                            {categories.filter(cat => activeCategoryIds.has(cat.id)).map(cat => (
+                                <Chip
+                                    key={cat.id}
+                                    selected={selectedCategories.includes(cat.id)}
+                                    onPress={() => toggleCategory(cat.id)}
+                                    style={{ marginRight: 5, height: 36, justifyContent: 'center' }}
+                                    showSelectedOverlay
+                                >
+                                    {cat.name}
+                                </Chip>
+                            ))}
+                        </ScrollView>
                         <LineChart
                             data={chartData}
                             width={screenWidth - 60}

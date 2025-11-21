@@ -9,6 +9,7 @@ export default function CreateInvoiceScreen({ navigation, route }) {
     const products = useStore((state) => state.products);
     const addInvoice = useStore((state) => state.addInvoice);
     const updateInvoice = useStore((state) => state.updateInvoice);
+    const addCustomer = useStore((state) => state.addCustomer); // Add this
     const theme = useTheme();
     const currency = useCurrency();
 
@@ -36,8 +37,62 @@ export default function CreateInvoiceScreen({ navigation, route }) {
 
     // Modal States
     const [customerModalVisible, setCustomerModalVisible] = useState(false);
+    const [newCustomerModalVisible, setNewCustomerModalVisible] = useState(false); // New modal state
+    const [customerSearchQuery, setCustomerSearchQuery] = useState(''); // Search state
     const [productModalVisible, setProductModalVisible] = useState(false);
     const [productSearchQuery, setProductSearchQuery] = useState('');
+
+    // New Customer Form State
+    const [newCustomerName, setNewCustomerName] = useState('');
+    const [newCustomerPhone, setNewCustomerPhone] = useState('');
+    const [newCustomerAddress, setNewCustomerAddress] = useState('');
+
+    // Filtered Customers
+    const filteredCustomers = useMemo(() => {
+        if (!customerSearchQuery) return customers;
+        return customers.filter(c =>
+            c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+            (c.phone && c.phone.includes(customerSearchQuery))
+        );
+    }, [customers, customerSearchQuery]);
+
+    // Duplicate Check
+    const possibleDuplicates = useMemo(() => {
+        if (!newCustomerName.trim() && !newCustomerPhone.trim()) return [];
+        return customers.filter(c =>
+            (newCustomerName.trim() && c.name.toLowerCase().includes(newCustomerName.trim().toLowerCase())) ||
+            (newCustomerPhone.trim() && c.phone.includes(newCustomerPhone.trim()))
+        );
+    }, [newCustomerName, newCustomerPhone, customers]);
+
+    const handleCreateCustomer = () => {
+        if (!newCustomerName.trim()) {
+            alert('Customer name is required');
+            return;
+        }
+
+        const newCustomer = {
+            name: newCustomerName.trim(),
+            phone: newCustomerPhone.trim(),
+            address: newCustomerAddress.trim()
+        };
+
+        addCustomer(newCustomer);
+
+        // Find the newly added customer (it will have an ID generated in store)
+        setTimeout(() => {
+            const allCustomers = useStore.getState().customers;
+            const created = allCustomers.find(c => c.name === newCustomer.name && c.phone === newCustomer.phone);
+            if (created) {
+                setSelectedCustomer(created);
+            }
+        }, 50);
+
+        setNewCustomerModalVisible(false);
+        setNewCustomerName('');
+        setNewCustomerPhone('');
+        setNewCustomerAddress('');
+    };
 
     const filteredProducts = useMemo(() => {
         if (!productSearchQuery) return products;
@@ -228,10 +283,24 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                                     <Text variant="titleMedium">{selectedCustomer.name}</Text>
                                     <Text>{selectedCustomer.phone}</Text>
                                     <Text>{selectedCustomer.address}</Text>
-                                    <Button onPress={() => setCustomerModalVisible(true)}>Change</Button>
+                                    <View style={{ flexDirection: 'row', marginTop: 10 }}>
+                                        <Button mode="outlined" onPress={() => setCustomerModalVisible(true)} style={{ marginRight: 10, flex: 1 }}>
+                                            Change (Existing)
+                                        </Button>
+                                        <Button mode="contained" onPress={() => setNewCustomerModalVisible(true)} style={{ flex: 1 }}>
+                                            New Customer
+                                        </Button>
+                                    </View>
                                 </View>
                             ) : (
-                                <Button mode="outlined" onPress={() => setCustomerModalVisible(true)}>Select Customer</Button>
+                                <View style={{ flexDirection: 'row' }}>
+                                    <Button mode="outlined" onPress={() => setCustomerModalVisible(true)} style={{ marginRight: 10, flex: 1 }}>
+                                        Existing Customer
+                                    </Button>
+                                    <Button mode="contained" onPress={() => setNewCustomerModalVisible(true)} style={{ flex: 1 }}>
+                                        New Customer
+                                    </Button>
+                                </View>
                             )}
                         </Card.Content>
                     </Card>
@@ -362,8 +431,16 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                         <Text variant="titleLarge">Select Customer</Text>
                         <IconButton icon="close" size={24} onPress={() => setCustomerModalVisible(false)} />
                     </View>
+                    <TextInput
+                        placeholder="Search Customer..."
+                        value={customerSearchQuery}
+                        onChangeText={setCustomerSearchQuery}
+                        mode="outlined"
+                        style={{ marginBottom: 10 }}
+                        dense
+                    />
                     <FlatList
-                        data={customers}
+                        data={filteredCustomers}
                         keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
                             <List.Item
@@ -377,12 +454,85 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                             />
                         )}
                     />
-                    <Button onPress={() => { setCustomerModalVisible(false); navigation.navigate('CustomerForm'); }}>Add New Customer</Button>
                 </Modal>
             </Portal>
 
-            {/* Product Selection Modal */}
+
+            {/* New Customer Modal */}
             <Portal>
+                <Modal
+                    visible={newCustomerModalVisible}
+                    onDismiss={() => setNewCustomerModalVisible(false)}
+                    contentContainerStyle={[styles.modalContent, { backgroundColor: theme.colors.surface, width: '98%', height: '95%', margin: 0, marginTop: 20, alignSelf: 'center', justifyContent: 'flex-start' }]}
+                >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                        <Text variant="titleLarge">Add New Customer</Text>
+                        <IconButton icon="close" size={24} onPress={() => setNewCustomerModalVisible(false)} />
+                    </View>
+
+                    <TextInput
+                        label="Name *"
+                        value={newCustomerName}
+                        onChangeText={setNewCustomerName}
+                        mode="outlined"
+                        style={styles.input}
+                    />
+                    <TextInput
+                        label="Phone"
+                        value={newCustomerPhone}
+                        onChangeText={setNewCustomerPhone}
+                        keyboardType="phone-pad"
+                        mode="outlined"
+                        style={styles.input}
+                    />
+                    <TextInput
+                        label="Address"
+                        value={newCustomerAddress}
+                        onChangeText={setNewCustomerAddress}
+                        mode="outlined"
+                        style={styles.input}
+                        multiline
+                    />
+
+                    {possibleDuplicates.length > 0 && (
+                        <View style={{ marginTop: 10, flex: 1 }}>
+                            <Text variant="titleSmall" style={{ marginBottom: 5 }}>
+                                Similar customers found ({possibleDuplicates.length}):
+                            </Text>
+                            <Text variant="bodySmall" style={{ marginBottom: 5, color: theme.colors.outline }}>
+                                Tap to select an existing customer instead:
+                            </Text>
+                            <FlatList
+                                data={possibleDuplicates}
+                                keyExtractor={(item) => item.id}
+                                renderItem={({ item }) => (
+                                    <List.Item
+                                        title={item.name}
+                                        description={`${item.phone || 'No phone'}${item.address ? ' • ' + item.address : ''}`}
+                                        left={props => <List.Icon {...props} icon="account" color={theme.colors.primary} />}
+                                        onPress={() => {
+                                            setSelectedCustomer(item);
+                                            setNewCustomerModalVisible(false);
+                                            setNewCustomerName('');
+                                            setNewCustomerPhone('');
+                                            setNewCustomerAddress('');
+                                        }}
+                                        style={{ backgroundColor: theme.colors.surfaceVariant, borderRadius: 8, marginBottom: 5 }}
+                                    />
+                                )}
+                            />
+                        </View>
+                    )}
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 }}>
+                        <Button onPress={() => setNewCustomerModalVisible(false)} style={{ marginRight: 10 }}>Cancel</Button>
+                        <Button mode="contained" onPress={handleCreateCustomer}>Save & Select</Button>
+                    </View>
+                </Modal>
+            </Portal >
+
+            {/* Product Selection Modal */}
+            < Portal >
                 <Modal visible={productModalVisible} onDismiss={() => setProductModalVisible(false)} contentContainerStyle={[styles.modalContent, { backgroundColor: theme.colors.surface, width: '98%', height: '95%', margin: 0, marginTop: 20, alignSelf: 'center' }]}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                         <Text variant="titleLarge">Select Product</Text>
@@ -420,10 +570,10 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                         )}
                     />
                 </Modal>
-            </Portal>
+            </Portal >
 
             {/* Static Options Selection Modal */}
-            <Portal>
+            < Portal >
                 <Modal visible={optionsModalVisible} onDismiss={() => setOptionsModalVisible(false)} contentContainerStyle={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
                     <Text variant="titleLarge" style={{ marginBottom: 10 }}>Select Options</Text>
                     <ScrollView>
@@ -450,10 +600,10 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                         Confirm
                     </Button>
                 </Modal>
-            </Portal>
+            </Portal >
 
             {/* Edit Line Item Modal */}
-            <Portal>
+            < Portal >
                 <Modal visible={editItemModalVisible} onDismiss={() => setEditItemModalVisible(false)} contentContainerStyle={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
                     <Text variant="titleLarge" style={{ marginBottom: 10 }}>Customize Item</Text>
                     {editingItem && (
@@ -488,8 +638,8 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                         </View>
                     )}
                 </Modal>
-            </Portal>
-        </View>
+            </Portal >
+        </View >
     );
 }
 
