@@ -475,7 +475,9 @@ export default function ReportScreen() {
                                 </DataTable.Header>
                                 {itemData.map((item, index) => (
                                     <DataTable.Row key={index} onPress={() => setSelectedProductForTrend(item.name)}>
-                                        <DataTable.Cell style={{ flex: 2 }}>{item.name}</DataTable.Cell>
+                                        <DataTable.Cell style={{ flex: 2 }}>
+                                            <Text numberOfLines={2}>{item.name}</Text>
+                                        </DataTable.Cell>
                                         <DataTable.Cell numeric>{item.quantity}</DataTable.Cell>
                                         <DataTable.Cell numeric>
                                             <Text numberOfLines={1} adjustsFontSizeToFit>
