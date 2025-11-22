@@ -7,14 +7,22 @@ export default function LoginScreen() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const login = useStore((state) => state.login);
-    const [error, setError] = useState('');
+    const isLoading = useStore((state) => state.isLoading);
+    const storeError = useStore((state) => state.error);
+    const [localError, setLocalError] = useState('');
     const theme = useTheme();
 
-    const handleLogin = () => {
-        if (login(username, password)) {
-            setError('');
+    const handleLogin = async () => {
+        if (!username || !password) {
+            setLocalError('Please enter both email and password');
+            return;
+        }
+
+        const success = await login(username, password);
+        if (!success) {
+            // Error is handled in store
         } else {
-            setError('Invalid credentials');
+            setLocalError('');
         }
     };
 
@@ -27,11 +35,13 @@ export default function LoginScreen() {
                 <Surface style={styles.surface} elevation={4}>
                     <Text variant="headlineMedium" style={styles.title}>Admin Login</Text>
                     <TextInput
-                        label="Username"
+                        label="Email"
                         value={username}
                         onChangeText={setUsername}
                         style={styles.input}
                         mode="outlined"
+                        autoCapitalize="none"
+                        keyboardType="email-address"
                     />
                     <TextInput
                         label="Password"
@@ -41,8 +51,15 @@ export default function LoginScreen() {
                         style={styles.input}
                         mode="outlined"
                     />
-                    {error ? <Text style={styles.error}>{error}</Text> : null}
-                    <Button mode="contained" onPress={handleLogin} style={styles.button}>
+                    {localError ? <Text style={styles.error}>{localError}</Text> : null}
+                    {storeError ? <Text style={styles.error}>{storeError}</Text> : null}
+                    <Button
+                        mode="contained"
+                        onPress={handleLogin}
+                        style={styles.button}
+                        loading={isLoading}
+                        disabled={isLoading}
+                    >
                         Login
                     </Button>
                 </Surface>

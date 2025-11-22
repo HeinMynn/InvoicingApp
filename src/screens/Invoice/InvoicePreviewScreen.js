@@ -198,6 +198,20 @@ export default function InvoicePreviewScreen({ route, navigation }) {
                                 );
                             })}
 
+                            {/* Delivery Fee Row */}
+                            {parseFloat(invoice.deliveryFee || 0) > 0 && (
+                                <View style={styles.tableDataRow}>
+                                    <View style={[styles.tableCell, styles.tableCellName]}>
+                                        <Text style={styles.tableCellText}>Delivery Fee</Text>
+                                    </View>
+                                    <View style={[styles.tableCell, styles.tableCellQty]} />
+                                    <View style={[styles.tableCell, styles.tableCellPrice]} />
+                                    <View style={[styles.tableCell, styles.tableCellTotal]}>
+                                        <Text style={[styles.tableCellText, styles.alignRight]}>{formatPrice(invoice.deliveryFee)}</Text>
+                                    </View>
+                                </View>
+                            )}
+
                             {/* Subtotal Row */}
                             <View style={styles.tableDataRow}>
                                 <View style={[styles.tableCell, styles.tableCellName]} />
@@ -206,7 +220,7 @@ export default function InvoicePreviewScreen({ route, navigation }) {
                                     <Text style={[styles.tableCellText, styles.boldText]}>Subtotal:</Text>
                                 </View>
                                 <View style={[styles.tableCell, styles.tableCellTotal]}>
-                                    <Text style={[styles.tableCellText, styles.alignRight, styles.boldText]}>{formatPrice(invoice.total)}</Text>
+                                    <Text style={[styles.tableCellText, styles.alignRight, styles.boldText]}>{formatPrice(invoice.total + parseFloat(invoice.deliveryFee || 0))}</Text>
                                 </View>
                             </View>
 
@@ -238,13 +252,21 @@ export default function InvoicePreviewScreen({ route, navigation }) {
 
                             {/* Grand Total Row */}
                             <View style={styles.tableDataRow}>
-                                <View style={[styles.tableCell, styles.tableCellName]} />
+                                <View style={[styles.tableCell, styles.tableCellName, { justifyContent: 'center', alignItems: 'center' }]}>
+                                    {parseFloat(invoice.deliveryFee || 0) > 0 && (
+                                        <View style={styles.inlineStamp}>
+                                            <Text style={styles.stampText}>Deli ရှင်းပြီး</Text>
+                                        </View>
+                                    )}
+                                </View>
                                 <View style={[styles.tableCell, styles.tableCellQty]} />
                                 <View style={[styles.tableCell, styles.tableCellPrice]}>
                                     <Text style={[styles.tableCellText, styles.boldText]}>Grand Total:</Text>
                                 </View>
                                 <View style={[styles.tableCell, styles.tableCellTotal]}>
-                                    <Text style={[styles.tableCellText, styles.alignRight, styles.boldText]}>{formatPrice(invoice.total - (invoice.deposit || 0) - (invoice.discount || 0))}</Text>
+                                    <Text style={[styles.tableCellText, styles.alignRight, styles.boldText]}>
+                                        {formatPrice(invoice.total + parseFloat(invoice.deliveryFee || 0) - (invoice.deposit || 0) - (invoice.discount || 0))}
+                                    </Text>
                                 </View>
                             </View>
                         </View>
@@ -294,6 +316,22 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         elevation: 4,
         minWidth: 800,
+        position: 'relative', // For absolute positioning of stamp
+    },
+    // ... (existing styles)
+    inlineStamp: {
+        borderWidth: 3,
+        borderColor: '#d32f2f',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        transform: [{ rotate: '-10deg' }],
+        borderRadius: 5,
+    },
+    stampText: {
+        color: '#d32f2f',
+        fontSize: 18,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
     },
     shopHeader: {
         flexDirection: 'row',

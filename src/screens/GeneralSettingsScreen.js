@@ -17,6 +17,8 @@ export default function GeneralSettingsScreen() {
     const invoices = useStore((state) => state.invoices);
     const customers = useStore((state) => state.customers);
     const importData = useStore((state) => state.importData);
+    const syncData = useStore((state) => state.syncData);
+    const isLoading = useStore((state) => state.isLoading);
     const theme = useTheme();
 
     const [currency, setCurrency] = useState(shopInfo.currency || 'MMK');
@@ -40,6 +42,16 @@ export default function GeneralSettingsScreen() {
     const handleSaveUpdateUrl = () => {
         updateShopInfo({ updateCheckUrl });
         Alert.alert('Success', 'Update check URL saved successfully');
+    };
+
+    const handleSync = async () => {
+        const success = await syncData();
+        if (success) {
+            Alert.alert('Success', 'Data synced with cloud successfully');
+        } else {
+            const error = useStore.getState().error;
+            Alert.alert('Sync Failed', error || 'Unknown error occurred');
+        }
     };
 
     const handleCheckForUpdates = async () => {
@@ -203,6 +215,17 @@ export default function GeneralSettingsScreen() {
             <View style={styles.section}>
                 <Text variant="titleMedium" style={styles.sectionTitle}>Data Management</Text>
 
+                <Button
+                    mode="contained"
+                    onPress={handleSync}
+                    style={{ marginBottom: 20 }}
+                    icon="cloud-sync"
+                    loading={isLoading}
+                    disabled={isLoading}
+                >
+                    Sync Data with Cloud
+                </Button>
+
                 <List.Section>
                     <List.Subheader>Export Data</List.Subheader>
                     <List.Item
@@ -291,7 +314,21 @@ export default function GeneralSettingsScreen() {
             <Divider style={styles.divider} />
 
             <View style={styles.section}>
-                <Button mode="outlined" onPress={useStore.getState().logout} style={{ borderColor: 'red' }} textColor="red">
+                <Button
+                    mode="outlined"
+                    onPress={() => {
+                        Alert.alert(
+                            'Logout',
+                            'Are you sure you want to logout? Any unsynced data will be lost from this device.',
+                            [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Logout', onPress: useStore.getState().logout, style: 'destructive' }
+                            ]
+                        );
+                    }}
+                    style={{ borderColor: 'red' }}
+                    textColor="red"
+                >
                     Logout
                 </Button>
             </View>

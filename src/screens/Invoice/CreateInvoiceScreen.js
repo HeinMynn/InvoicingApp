@@ -23,6 +23,7 @@ export default function CreateInvoiceScreen({ navigation, route }) {
     const [gateName, setGateName] = useState('');
     const [deposit, setDeposit] = useState('0');
     const [discount, setDiscount] = useState('0');
+    const [deliveryFee, setDeliveryFee] = useState('0');
     const [deliveryMenuVisible, setDeliveryMenuVisible] = useState(false);
 
     useEffect(() => {
@@ -259,7 +260,8 @@ export default function CreateInvoiceScreen({ navigation, route }) {
             deliveryInfo,
             gateName: deliveryInfo === 'ကားဂိတ်ချ' ? gateName : '',
             deposit: parseFloat(deposit || 0),
-            discount: parseFloat(discount || 0)
+            discount: parseFloat(discount || 0),
+            deliveryFee: parseFloat(deliveryFee || 0)
         };
 
         if (editingInvoice) {
@@ -355,6 +357,14 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                     {/* Additional Info */}
                     <Card style={styles.card}>
                         <Card.Content>
+                            <TextInput
+                                label="Delivery Fee"
+                                value={deliveryFee}
+                                onChangeText={setDeliveryFee}
+                                keyboardType="numeric"
+                                mode="outlined"
+                                style={styles.input}
+                            />
                             <TextInput
                                 label="Deposit Amount"
                                 value={deposit}

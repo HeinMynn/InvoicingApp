@@ -6,6 +6,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useStore } from './src/store/useStore';
 import { Linking, Alert } from 'react-native';
 import { checkForUpdates, shouldCheckForUpdate, saveUpdateCheckTimestamp, skipVersion, DEFAULT_UPDATE_URL } from './src/utils/updateChecker';
+import { auth } from './src/config/firebase';
+import NetInfo from '@react-native-community/netinfo';
 
 const lightTheme = {
   ...MD3LightTheme,
@@ -151,9 +153,55 @@ function AppContent() {
     };
   }, [importData]);
 
-  // Check for updates on app launch
+  // Check for updates and sync data on app launch
   useEffect(() => {
     checkForAppUpdates();
+
+    // Listen for Firebase Auth state changes
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (user) {
+        // User is signed in to Firebase
+        console.log('Firebase Auth Restored:', user.uid);
+
+        // Now check if Zustand is hydrated
+        const state = useStore.getState();
+        if (state._hasHydrated) {
+          // Safe to sync now
+          state.syncData();
+        } else {
+          // Wait for hydration
+          const unsubHydrate = useStore.subscribe((s) => {
+            if (s._hasHydrated) {
+              s.syncData();
+              unsubHydrate(); // Run once
+            }
+          });
+        }
+      } else {
+        console.log('Firebase Auth: No user');
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+    };
+  }, []);
+
+  // Auto-sync when internet connection is restored
+  useEffect(() => {
+    const unsubscribeNet = NetInfo.addEventListener(state => {
+      if (state.isConnected && state.isInternetReachable) {
+        console.log('Internet Restored: Triggering Sync...');
+        const store = useStore.getState();
+        if (store.user && store._hasHydrated) {
+          store.syncData();
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeNet();
+    };
   }, []);
 
   return (
