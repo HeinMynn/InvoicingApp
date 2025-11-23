@@ -30,6 +30,7 @@ export default function ProductFormScreen({ navigation, route }) {
 
     // Scanner State
     const [scannerVisible, setScannerVisible] = useState(false);
+    const [scanningTarget, setScanningTarget] = useState({ type: 'main' }); // { type: 'main' } or { type: 'variable', id: '...' }
 
     // Keyboard listeners
     useEffect(() => {
@@ -59,17 +60,21 @@ export default function ProductFormScreen({ navigation, route }) {
     const [newAttributeName, setNewAttributeName] = useState(''); // For creating new global attribute inline
     const [attributeValueInputs, setAttributeValueInputs] = useState({}); // { attributeId: 'value' }
 
-    // Variables: [{ id, attributes: { Color: 'Red', Size: 'L' }, price, salePrice }]
+    // Variables: [{ id, attributes: { Color: 'Red', Size: 'L' }, price, salePrice, barcode }]
     const [variables, setVariables] = useState(product?.variables || []);
     const [visibleMenu, setVisibleMenu] = useState(null); // { variableId: string, attributeName: string } | null
 
     // Barcode Logic
     const handleScan = (data) => {
-        setBarcode(data);
+        if (scanningTarget.type === 'variable') {
+            updateVariableField(scanningTarget.id, 'barcode', data);
+        } else {
+            setBarcode(data);
+        }
         setScannerVisible(false);
     };
 
-    const generateBarcode = () => {
+    const generateBarcode = (target = { type: 'main' }) => {
         // Simple random 8-digit number
         const randomCode = Math.floor(10000000 + Math.random() * 90000000).toString();
 
@@ -82,11 +87,31 @@ export default function ProductFormScreen({ navigation, route }) {
             }
         }
 
-        setBarcode(prefix + randomCode);
+        const finalCode = prefix + randomCode;
+
+        if (target.type === 'variable') {
+            updateVariableField(target.id, 'barcode', finalCode);
+        } else {
+            setBarcode(finalCode);
+        }
     };
 
-    const printLabel = async () => {
-        if (!barcode) {
+    const printLabel = async (target = { type: 'main' }) => {
+        let codeToPrint = barcode;
+        let productNameToPrint = name;
+        let variantNameToPrint = '';
+        let priceToPrint = price;
+
+        if (target.type === 'variable') {
+            const v = variables.find(v => v.id === target.id);
+            if (v) {
+                codeToPrint = v.barcode;
+                variantNameToPrint = getVariableName(v);
+                priceToPrint = v.price || price;
+            }
+        }
+
+        if (!codeToPrint) {
             Alert.alert("No Barcode", "Please generate or scan a barcode first.");
             return;
         }
@@ -116,47 +141,60 @@ export default function ProductFormScreen({ navigation, route }) {
                         }
                         .label {
                             text-align: center;
-                            width: 100%;
-                            height: 100%;
+                            width: 98%;
+                            height: 98%;
                             display: flex;
                             flex-direction: column;
                             justify-content: center;
                             align-items: center;
                         }
                         .product-name {
-                            font-size: 12px;
+                            font-size: 10px;
                             font-weight: bold;
-                            margin-bottom: 2px;
+                            margin-bottom: 1px;
+                            line-height: 1.1;
+                            max-height: 2.2em; /* Limit to 2 lines */
+                            overflow: hidden;
+                            word-wrap: break-word;
+                            width: 100%;
+                        }
+                        .variant-name {
+                            font-size: 9px;
+                            margin-bottom: 1px;
                             white-space: nowrap;
                             overflow: hidden;
                             text-overflow: ellipsis;
-                            max-width: 95%;
+                            max-width: 100%;
                         }
                         .price {
-                            font-size: 10px;
-                            margin-bottom: 2px;
+                            font-size: 11px;
+                            font-weight: bold;
+                            margin-bottom: 1px;
                         }
                         svg {
-                            max-width: 95%;
+                            width: 95%;
                             height: auto;
+                            max-height: 15mm; /* Ensure barcode doesn't take up too much vertical space */
                         }
                     </style>
                 </head>
                 <body>
                     <div class="label">
-                        <div class="product-name">${name || 'Product Name'}</div>
-                        <div class="price">${price ? price + ' MMK' : ''}</div>
+                        <div class="product-name">${productNameToPrint || 'Product Name'}</div>
+                        ${variantNameToPrint ? `<div class="variant-name">${variantNameToPrint}</div>` : ''}
+                        <div class="price">${priceToPrint ? parseInt(priceToPrint).toLocaleString() + ' Ks' : ''}</div>
                         <svg id="barcode"></svg>
                     </div>
                     <script>
-                        JsBarcode("#barcode", "${barcode}", {
+                        JsBarcode("#barcode", "${codeToPrint}", {
                             format: "CODE128",
                             lineColor: "#000",
                             width: 2,
                             height: 30,
                             displayValue: true,
-                            fontSize: 10,
-                            margin: 0
+                            fontSize: 9,
+                            margin: 0,
+                            textMargin: 0
                         });
                     </script>
                 </body>
@@ -166,7 +204,7 @@ export default function ProductFormScreen({ navigation, route }) {
         try {
             await Print.printAsync({
                 html,
-                width: unit === 'mm' ? parseInt(width) * 2.83465 : parseInt(width) * 72, // Approx conversion to points if needed, though @page usually handles it
+                width: unit === 'mm' ? parseInt(width) * 2.83465 : parseInt(width) * 72,
                 height: unit === 'mm' ? parseInt(height) * 2.83465 : parseInt(height) * 72,
             });
         } catch (error) {
@@ -283,7 +321,8 @@ export default function ProductFormScreen({ navigation, route }) {
             id: Date.now().toString(),
             attributes: initialAttributes,
             price: price,
-            salePrice: salePrice
+            salePrice: salePrice,
+            barcode: ''
         }]);
     };
 
@@ -331,7 +370,8 @@ export default function ProductFormScreen({ navigation, route }) {
                 id: Date.now().toString() + Math.random().toString(), // Ensure unique ID
                 attributes,
                 price: price,
-                salePrice: salePrice
+                salePrice: salePrice,
+                barcode: ''
             };
         });
 
@@ -347,7 +387,7 @@ export default function ProductFormScreen({ navigation, route }) {
         } : v));
     };
 
-    const updateVariablePrice = (id, field, value) => {
+    const updateVariableField = (id, field, value) => {
         setVariables(variables.map(v => v.id === id ? { ...v, [field]: value } : v));
     };
 
@@ -591,11 +631,34 @@ export default function ProductFormScreen({ navigation, route }) {
                                         </Menu>
                                     </View>
                                 ))}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                                    <TextInput
+                                        label="Barcode"
+                                        value={v.barcode}
+                                        onChangeText={(text) => updateVariableField(v.id, 'barcode', text)}
+                                        style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                                        mode="outlined"
+                                        dense
+                                        right={<TextInput.Icon icon="barcode-scan" onPress={() => {
+                                            setScanningTarget({ type: 'variable', id: v.id });
+                                            setScannerVisible(true);
+                                        }} />}
+                                    />
+                                    <View style={{ flexDirection: 'column', marginLeft: 10 }}>
+                                        <Button mode="contained" onPress={() => generateBarcode({ type: 'variable', id: v.id })} compact style={{ marginBottom: 5 }}>
+                                            Gen
+                                        </Button>
+                                        <Button mode="outlined" onPress={() => printLabel({ type: 'variable', id: v.id })} compact disabled={!v.barcode}>
+                                            Print
+                                        </Button>
+                                    </View>
+                                </View>
+
                                 <View style={styles.variableRow}>
                                     <TextInput
                                         label="Price"
                                         value={v.price}
-                                        onChangeText={(text) => updateVariablePrice(v.id, 'price', text)}
+                                        onChangeText={(text) => updateVariableField(v.id, 'price', text)}
                                         keyboardType="numeric"
                                         style={[styles.input, styles.flexInput]}
                                         mode="outlined"
@@ -604,7 +667,7 @@ export default function ProductFormScreen({ navigation, route }) {
                                     <TextInput
                                         label="Sale Price"
                                         value={v.salePrice}
-                                        onChangeText={(text) => updateVariablePrice(v.id, 'salePrice', text)}
+                                        onChangeText={(text) => updateVariableField(v.id, 'salePrice', text)}
                                         keyboardType="numeric"
                                         style={[styles.input, styles.flexInput]}
                                         mode="outlined"
