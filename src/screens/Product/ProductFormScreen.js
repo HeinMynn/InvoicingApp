@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Keyboard, Alert } from 'react-native';
 import { TextInput, Button, Text, IconButton, Card, Chip, Dialog, Portal, List, Menu, useTheme } from 'react-native-paper';
 import { useStore } from '../../store/useStore';
-
 import { useHeaderHeight } from '@react-navigation/elements';
+import BarcodeScanner from '../../components/BarcodeScanner';
+import * as Print from 'expo-print';
 
 export default function ProductFormScreen({ navigation, route }) {
     const { product } = route.params || {};
@@ -23,8 +24,12 @@ export default function ProductFormScreen({ navigation, route }) {
     const [name, setName] = useState(product?.name || '');
     const [price, setPrice] = useState(product?.price || '');
     const [salePrice, setSalePrice] = useState(product?.salePrice || '');
+    const [barcode, setBarcode] = useState(product?.barcode || ''); // Barcode State
     const [variablePrice, setVariablePrice] = useState('');
     const [variableSalePrice, setVariableSalePrice] = useState('');
+
+    // Scanner State
+    const [scannerVisible, setScannerVisible] = useState(false);
 
     // Keyboard listeners
     useEffect(() => {
@@ -58,11 +63,116 @@ export default function ProductFormScreen({ navigation, route }) {
     const [variables, setVariables] = useState(product?.variables || []);
     const [visibleMenu, setVisibleMenu] = useState(null); // { variableId: string, attributeName: string } | null
 
-    // Static Options: Removed legacy code
-    // const [staticOptions, setStaticOptions] = useState(product?.staticOptions || []);
-    // const [newOptionName, setNewOptionName] = useState('');
-    // const [optionDialogVisible, setOptionDialogVisible] = useState(false);
-    // const [newOptionValue, setNewOptionValue] = useState({}); // { optionId: 'value' }
+    // Barcode Logic
+    const handleScan = (data) => {
+        setBarcode(data);
+        setScannerVisible(false);
+    };
+
+    const generateBarcode = () => {
+        // Simple random 8-digit number
+        const randomCode = Math.floor(10000000 + Math.random() * 90000000).toString();
+
+        // Check for category prefix
+        let prefix = '';
+        if (categoryId) {
+            const category = categories.find(c => c.id === categoryId);
+            if (category && category.barcodePrefix) {
+                prefix = category.barcodePrefix;
+            }
+        }
+
+        setBarcode(prefix + randomCode);
+    };
+
+    const printLabel = async () => {
+        if (!barcode) {
+            Alert.alert("No Barcode", "Please generate or scan a barcode first.");
+            return;
+        }
+
+        const shopInfo = useStore.getState().shopInfo;
+        const { width, height, unit } = shopInfo.labelSettings || { width: '50', height: '30', unit: 'mm' };
+
+        const html = `
+            <html>
+                <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+                    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
+                    <style>
+                        @page {
+                            size: ${width}${unit} ${height}${unit};
+                            margin: 0;
+                        }
+                        body {
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            width: ${width}${unit};
+                            height: ${height}${unit};
+                            margin: 0;
+                            font-family: sans-serif;
+                            overflow: hidden;
+                        }
+                        .label {
+                            text-align: center;
+                            width: 100%;
+                            height: 100%;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            align-items: center;
+                        }
+                        .product-name {
+                            font-size: 12px;
+                            font-weight: bold;
+                            margin-bottom: 2px;
+                            white-space: nowrap;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            max-width: 95%;
+                        }
+                        .price {
+                            font-size: 10px;
+                            margin-bottom: 2px;
+                        }
+                        svg {
+                            max-width: 95%;
+                            height: auto;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="label">
+                        <div class="product-name">${name || 'Product Name'}</div>
+                        <div class="price">${price ? price + ' MMK' : ''}</div>
+                        <svg id="barcode"></svg>
+                    </div>
+                    <script>
+                        JsBarcode("#barcode", "${barcode}", {
+                            format: "CODE128",
+                            lineColor: "#000",
+                            width: 2,
+                            height: 30,
+                            displayValue: true,
+                            fontSize: 10,
+                            margin: 0
+                        });
+                    </script>
+                </body>
+            </html>
+        `;
+
+        try {
+            await Print.printAsync({
+                html,
+                width: unit === 'mm' ? parseInt(width) * 2.83465 : parseInt(width) * 72, // Approx conversion to points if needed, though @page usually handles it
+                height: unit === 'mm' ? parseInt(height) * 2.83465 : parseInt(height) * 72,
+            });
+        } catch (error) {
+            Alert.alert("Printing Error", "Could not print label: " + error.message);
+        }
+    };
 
 
     const handleAddAttributeToProduct = (globalAttr) => {
@@ -251,9 +361,6 @@ export default function ProductFormScreen({ navigation, route }) {
         return parts.length > 0 ? parts.join(' / ') : 'New Variant';
     };
 
-    // Legacy Static Options Logic Removed
-    // ...
-
     const handleSave = () => {
         // Construct the final variables list with a generated 'name' for backward compatibility/display
         const finalVariables = variables.map(v => ({
@@ -265,11 +372,11 @@ export default function ProductFormScreen({ navigation, route }) {
             name,
             price,
             salePrice,
+            barcode, // Save barcode
             categoryId,
             selectedAttributes, // Save the full config
             attributes: selectedAttributes.filter(a => a.useAsVariation).map(a => a.name), // Backward compat
             variables: finalVariables,
-            // staticOptions, // Removed
         };
 
         if (product) {
@@ -305,6 +412,27 @@ export default function ProductFormScreen({ navigation, route }) {
                     style={styles.input}
                     mode="outlined"
                 />
+
+                {/* Barcode Section */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <TextInput
+                        label="Barcode"
+                        value={barcode}
+                        onChangeText={setBarcode}
+                        style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                        mode="outlined"
+                        right={<TextInput.Icon icon="barcode-scan" onPress={() => setScannerVisible(true)} />}
+                    />
+                    <View style={{ flexDirection: 'column', marginLeft: 10 }}>
+                        <Button mode="contained" onPress={generateBarcode} compact style={{ marginBottom: 5 }}>
+                            Generate
+                        </Button>
+                        <Button mode="outlined" onPress={printLabel} compact disabled={!barcode}>
+                            Print
+                        </Button>
+                    </View>
+                </View>
+
                 <View style={styles.row}>
                     <TextInput
                         label="Base Price"
@@ -489,8 +617,6 @@ export default function ProductFormScreen({ navigation, route }) {
                     ))
                 }
 
-                {/* Legacy Static Options UI Removed */}
-
                 <Button mode="contained" onPress={handleSave} style={styles.button}>
                     Save Product
                 </Button>
@@ -569,7 +695,13 @@ export default function ProductFormScreen({ navigation, route }) {
                     </Dialog>
                 </Portal>
 
-                {/* Legacy Option Dialog Removed */}
+                {/* Scanner Modal */}
+                <BarcodeScanner
+                    visible={scannerVisible}
+                    onDismiss={() => setScannerVisible(false)}
+                    onScan={handleScan}
+                />
+
             </ScrollView>
         </KeyboardAvoidingView>
     );

@@ -1,20 +1,21 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Keyboard, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Keyboard, TouchableOpacity, Alert } from 'react-native';
 import { TextInput, Button, Text, Card, IconButton, Menu, Divider, Portal, Modal, List, HelperText, useTheme } from 'react-native-paper';
 import { useStore } from '../../store/useStore';
 import { useCurrency } from '../../hooks/useCurrency';
+import BarcodeScanner from '../../components/BarcodeScanner';
 
 export default function CreateInvoiceScreen({ navigation, route }) {
     const customers = useStore((state) => state.customers);
     const products = useStore((state) => state.products);
     const addInvoice = useStore((state) => state.addInvoice);
     const updateInvoice = useStore((state) => state.updateInvoice);
-    const addCustomer = useStore((state) => state.addCustomer); // Add this
+    const addCustomer = useStore((state) => state.addCustomer);
     const shopInfo = useStore((state) => state.shopInfo);
     const theme = useTheme();
     const currency = useCurrency();
 
-    const editingInvoice = route.params?.invoice; // If provided, we're editing
+    const editingInvoice = route.params?.invoice;
 
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [selectedProducts, setSelectedProducts] = useState([]);
@@ -26,6 +27,9 @@ export default function CreateInvoiceScreen({ navigation, route }) {
     const [deliveryFee, setDeliveryFee] = useState('0');
     const [deliveryMenuVisible, setDeliveryMenuVisible] = useState(false);
 
+    // Scanner State
+    const [scannerVisible, setScannerVisible] = useState(false);
+
     useEffect(() => {
         if (editingInvoice) {
             const customer = customers.find(c => c.id === editingInvoice.customerId);
@@ -36,13 +40,14 @@ export default function CreateInvoiceScreen({ navigation, route }) {
             setGateName(editingInvoice.gateName || '');
             setDeposit(editingInvoice.deposit ? String(editingInvoice.deposit) : '0');
             setDiscount(editingInvoice.discount ? String(editingInvoice.discount) : '0');
+            setDeliveryFee(editingInvoice.deliveryFee ? String(editingInvoice.deliveryFee) : '0');
         }
     }, [editingInvoice]);
 
     // Modal States
     const [customerModalVisible, setCustomerModalVisible] = useState(false);
-    const [newCustomerModalVisible, setNewCustomerModalVisible] = useState(false); // New modal state
-    const [customerSearchQuery, setCustomerSearchQuery] = useState(''); // Search state
+    const [newCustomerModalVisible, setNewCustomerModalVisible] = useState(false);
+    const [customerSearchQuery, setCustomerSearchQuery] = useState('');
     const [productModalVisible, setProductModalVisible] = useState(false);
     const [productSearchQuery, setProductSearchQuery] = useState('');
 
@@ -83,7 +88,6 @@ export default function CreateInvoiceScreen({ navigation, route }) {
 
         addCustomer(newCustomer);
 
-        // Find the newly added customer (it will have an ID generated in store)
         setTimeout(() => {
             const allCustomers = useStore.getState().customers;
             const created = allCustomers.find(c => c.name === newCustomer.name && c.phone === newCustomer.phone);
@@ -106,13 +110,13 @@ export default function CreateInvoiceScreen({ navigation, route }) {
         );
     }, [products, productSearchQuery]);
 
-    const [editingItem, setEditingItem] = useState(null); // Copy of the item being edited
+    const [editingItem, setEditingItem] = useState(null);
     const [editItemModalVisible, setEditItemModalVisible] = useState(false);
 
     // Static Options Selection
     const [optionsModalVisible, setOptionsModalVisible] = useState(false);
-    const [pendingProduct, setPendingProduct] = useState(null); // { product, variable }
-    const [selectedOptions, setSelectedOptions] = useState({}); // { 'Color': 'Red' }
+    const [pendingProduct, setPendingProduct] = useState(null);
+    const [selectedOptions, setSelectedOptions] = useState({});
 
     const total = useMemo(() => {
         return selectedProducts.reduce((sum, item) => {
@@ -123,7 +127,6 @@ export default function CreateInvoiceScreen({ navigation, route }) {
 
     const initiateAddProduct = (product, variable = null) => {
         if (product.staticOptions && product.staticOptions.length > 0) {
-            // Auto-select options with only one value
             const autoSelected = {};
             const needsSelection = [];
 
@@ -135,14 +138,12 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                 }
             });
 
-            // If all options have only one value, add directly
             if (needsSelection.length === 0) {
                 addProductToInvoice(product, variable, autoSelected);
                 setProductModalVisible(false);
                 return;
             }
 
-            // Otherwise, show modal with pre-selected single-value options
             setPendingProduct({ product, variable });
             setSelectedOptions(autoSelected);
             setOptionsModalVisible(true);
@@ -154,7 +155,6 @@ export default function CreateInvoiceScreen({ navigation, route }) {
     };
 
     const confirmAddProductWithOptions = () => {
-        // Validate that all options are selected
         const missingOptions = pendingProduct.product.staticOptions.filter(opt => !selectedOptions[opt.name]);
         if (missingOptions.length > 0) {
             alert(`Please select ${missingOptions.map(o => o.name).join(', ')}`);
@@ -169,24 +169,20 @@ export default function CreateInvoiceScreen({ navigation, route }) {
         const price = variable ? (variable.salePrice || variable.price) : (product.salePrice || product.price);
         let name = variable ? `${product.name} (${variable.name})` : product.name;
 
-        // Append options to name
         const optionString = Object.entries(options).map(([key, value]) => `${key}: ${value}`).join(', ');
         if (optionString) {
             name += ` [${optionString}]`;
         }
 
-        // Collect static attributes (non-variation attributes from product)
         const staticAttributes = {};
         if (product.selectedAttributes) {
             product.selectedAttributes.forEach(attr => {
                 if (!attr.useAsVariation && attr.selectedValues && attr.selectedValues.length > 0) {
-                    // For non-variation attributes, use the first selected value
                     staticAttributes[attr.name] = attr.selectedValues[0];
                 }
             });
         }
 
-        // Check if the same product+variable+options already exists
         const existingItemIndex = selectedProducts.findIndex(item =>
             item.productId === product.id &&
             item.variableId === variable?.id &&
@@ -194,7 +190,6 @@ export default function CreateInvoiceScreen({ navigation, route }) {
         );
 
         if (existingItemIndex !== -1) {
-            // Item exists, increment quantity
             const updatedProducts = [...selectedProducts];
             updatedProducts[existingItemIndex] = {
                 ...updatedProducts[existingItemIndex],
@@ -202,9 +197,8 @@ export default function CreateInvoiceScreen({ navigation, route }) {
             };
             setSelectedProducts(updatedProducts);
         } else {
-            // Item doesn't exist, add new
             setSelectedProducts([...selectedProducts, {
-                id: Date.now().toString(), // unique id for this line item
+                id: Date.now().toString(),
                 productId: product.id,
                 variableId: variable?.id,
                 name,
@@ -213,10 +207,36 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                 discount: '0',
                 extraCharges: '0',
                 note: '',
-                selectedOptions: { ...options, ...staticAttributes }, // Merge manual options with static attributes
-                variableAttributes: variable?.attributes, // Store attributes for formatting (e.g. Width, Height)
-                productName: product.name // Store original product name to avoid parsing issues in preview
+                selectedOptions: { ...options, ...staticAttributes },
+                variableAttributes: variable?.attributes,
+                productName: product.name
             }]);
+        }
+    };
+
+    // Barcode Scanning Logic
+    const handleScan = (data) => {
+        setScannerVisible(false);
+        const scannedProduct = products.find(p => p.barcode === data);
+
+        if (scannedProduct) {
+            // If product has variables, we might need to prompt user.
+            // For now, if it has variables, we just open the product modal filtered to this product?
+            // Or better, if it has variables, we can't auto-add unless the barcode is specific to a variable (which we haven't implemented yet).
+            // Current implementation: Barcode is on the PRODUCT level.
+
+            if (scannedProduct.variables && scannedProduct.variables.length > 0) {
+                // If variables exist, we can't know which one to add.
+                // Let's open the product modal and filter by this product name to help the user.
+                setProductSearchQuery(scannedProduct.name);
+                setProductModalVisible(true);
+                Alert.alert("Select Variation", "This product has variations. Please select one.");
+            } else {
+                // No variables, add directly
+                initiateAddProduct(scannedProduct);
+            }
+        } else {
+            Alert.alert("Product Not Found", `No product found with barcode: ${data}`);
         }
     };
 
@@ -313,7 +333,15 @@ export default function CreateInvoiceScreen({ navigation, route }) {
 
                     {/* Products Section */}
                     <Card style={styles.card}>
-                        <Card.Title title="Products" right={(props) => <Button onPress={() => setProductModalVisible(true)}>Add</Button>} />
+                        <Card.Title
+                            title="Products"
+                            right={(props) => (
+                                <View style={{ flexDirection: 'row' }}>
+                                    <IconButton icon="barcode-scan" onPress={() => setScannerVisible(true)} />
+                                    <Button onPress={() => setProductModalVisible(true)}>Add</Button>
+                                </View>
+                            )}
+                        />
                         <Card.Content>
                             {selectedProducts.map((item) => (
                                 <View key={item.id}>
@@ -685,6 +713,14 @@ export default function CreateInvoiceScreen({ navigation, route }) {
                     )}
                 </Modal>
             </Portal >
+
+            {/* Scanner Modal */}
+            <BarcodeScanner
+                visible={scannerVisible}
+                onDismiss={() => setScannerVisible(false)}
+                onScan={handleScan}
+            />
+
         </View >
     );
 }

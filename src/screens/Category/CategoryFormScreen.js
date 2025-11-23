@@ -11,10 +11,11 @@ export default function CategoryFormScreen({ navigation, route }) {
 
     const [name, setName] = useState(category?.name || '');
     const [description, setDescription] = useState(category?.description || '');
+    const [barcodePrefix, setBarcodePrefix] = useState(category?.barcodePrefix || '');
 
     const handleSave = () => {
         if (name.trim()) {
-            const categoryData = { name, description };
+            const categoryData = { name, description, barcodePrefix };
             if (category) {
                 updateCategory(category.id, categoryData);
             } else {
@@ -38,6 +39,14 @@ export default function CategoryFormScreen({ navigation, route }) {
                     style={styles.input}
                     mode="outlined"
                     autoFocus
+                />
+                <TextInput
+                    label="Barcode Prefix (e.g. 'CAT-')"
+                    value={barcodePrefix}
+                    onChangeText={setBarcodePrefix}
+                    style={styles.input}
+                    mode="outlined"
+                    autoCapitalize="characters"
                 />
                 <TextInput
                     label="Description"

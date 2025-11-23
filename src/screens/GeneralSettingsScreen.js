@@ -203,6 +203,48 @@ export default function GeneralSettingsScreen() {
             <Divider style={styles.divider} />
 
             <View style={styles.section}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>Barcode Label Settings</Text>
+                <View style={styles.row}>
+                    <TextInput
+                        label="Width"
+                        value={shopInfo.labelSettings?.width || '50'}
+                        onChangeText={(text) => updateShopInfo({ labelSettings: { ...shopInfo.labelSettings, width: text } })}
+                        style={[styles.input, { flex: 1, marginRight: 10 }]}
+                        mode="outlined"
+                        keyboardType="numeric"
+                    />
+                    <TextInput
+                        label="Height"
+                        value={shopInfo.labelSettings?.height || '30'}
+                        onChangeText={(text) => updateShopInfo({ labelSettings: { ...shopInfo.labelSettings, height: text } })}
+                        style={[styles.input, { flex: 1 }]}
+                        mode="outlined"
+                        keyboardType="numeric"
+                    />
+                </View>
+                <View style={styles.row}>
+                    <Text>Unit:</Text>
+                    <RadioButton.Group
+                        onValueChange={(value) => updateShopInfo({ labelSettings: { ...shopInfo.labelSettings, unit: value } })}
+                        value={shopInfo.labelSettings?.unit || 'mm'}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 20 }}>
+                                <RadioButton value="mm" />
+                                <Text>mm</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <RadioButton value="in" />
+                                <Text>inches</Text>
+                            </View>
+                        </View>
+                    </RadioButton.Group>
+                </View>
+            </View>
+
+            <Divider style={styles.divider} />
+
+            <View style={styles.section}>
                 <Text variant="titleMedium" style={styles.sectionTitle}>Appearance</Text>
                 <View style={styles.row}>
                     <Text variant="bodyLarge">Dark Mode</Text>

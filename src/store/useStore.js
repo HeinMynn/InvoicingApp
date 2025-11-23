@@ -351,6 +351,11 @@ export const useStore = create(
         currency: 'MMK',
         deliveryOptions: ['Royal Express', 'ကားဂိတ်ချ', 'Bee Express', 'Icare Delivery', 'Ninja Van'],
         updateCheckUrl: 'https://gist.githubusercontent.com/HeinMynn/199fa70bb75f48a7b9d03b5ccc09d585/raw',
+        labelSettings: {
+          width: '50',
+          height: '30',
+          unit: 'mm'
+        }
       },
       updateShopInfo: async (info) => {
         set((state) => ({
